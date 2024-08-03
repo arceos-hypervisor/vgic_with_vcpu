@@ -14,7 +14,7 @@ lazy_static! {
 impl VgicGlobal {
     pub fn new(__vgg: VgicGlobal) {
         let mut vgg = VGG.lock().unwrap();
-        *vgg = Some(__vgg);
+        vgg = __vgg;
     }
 }
 
