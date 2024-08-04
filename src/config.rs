@@ -5,7 +5,13 @@ use spin::Mutex;
 use lazy_static::lazy_static;
 
 lazy_static! {
-    pub static ref VGG: Mutex<Option<VgicGlobal>> = Mutex::new(None);
+    pub static ref VGG: Mutex<Option<VgicGlobal>> = Mutex::new(Some(VgicGlobal {
+        nr_lr: 1,
+        typer: 1,
+        iidr: 32,
+        mainten_irq: 32,
+        max_gic_vcpus: 32,
+    }));
 }
 
 #[derive(Clone, Copy)]

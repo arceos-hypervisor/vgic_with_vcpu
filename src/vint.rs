@@ -109,7 +109,7 @@ impl VgicInt {
         vgic_int.owner = None;
     }
 
-    fn set_hw(&self, hw: bool) {
+    pub fn set_hw(&self, hw: bool) {
         self.inner_const.hw.set(hw);
     }
 
@@ -220,7 +220,7 @@ impl VgicInt {
     }
 }
 
-struct VgicIntInnerMut {
+pub struct VgicIntInnerMut {
     pub owner: Option<Vcpu>,
     pub in_lr: bool,
     pub lr       : u16,

@@ -13,7 +13,7 @@ use crate::consts::*;
 #[derive(Clone, Copy, Default)]
 pub struct Sgis {
     pub pend: u8,
-    pub act: u8,
+    pub act : u8,
 }
 
 pub struct VgicCpuPriv {
@@ -21,7 +21,7 @@ pub struct VgicCpuPriv {
     pub inner_mut: RefCell<VgicCpuPrivMut>,
 }
 
-struct VgicCpuPrivMut {
+pub struct VgicCpuPrivMut {
     pub curr_lrs: [u16; GIC_LIST_REGS_NUM],
     pub sgis: [Sgis; GIC_SGIS_NUM],
 

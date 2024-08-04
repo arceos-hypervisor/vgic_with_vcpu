@@ -14,6 +14,7 @@ pub enum IrqState {
     IrqSActive,
     IrqSPendActive,
 }
+
 impl IrqState {
     pub fn num_to_state(num: usize) -> IrqState {
         match num {
@@ -43,10 +44,14 @@ pub fn gic_is_priv(int_id: usize) -> bool {
 
 use alloc::vec::Vec;
 pub struct Vm {
-    vcpu_list: Vec<Vcpu>
+    pub id: usize,
+    pub vcpu_list: Vec<Vcpu>
 }
 
 impl Vm {
+    pub fn id(&self) -> usize {
+        self.id
+    }
     pub fn vcpu(&self, id :usize) -> Option<Vcpu> {
         self.vcpu_list.get(id).copied()
     }
@@ -55,7 +60,19 @@ impl Vm {
     }
     pub fn has_interrupt(&self, id: usize) -> bool {false}
     pub fn emu_has_interrupt(&self, id: usize) -> bool {false}
-    pub fn has_vgic(&self) -> bool {true}
+    /*
+    pub fn emu_has_interrupt(&self, int_id: usize) -> bool {
+        for emu_dev in self.config().emulated_device_list() {
+            if int_id == emu_dev.irq_id {
+                return true;
+            }
+        }
+        false
+    }
+    */
+    pub fn vgic(&self) -> Vgic { 
+        Vgic::new(1, 1, 1)
+    }
 
     #[inline]
     pub fn vcpu_list(&self) -> &[Vcpu] {
@@ -100,6 +117,7 @@ impl Vm {
 
 
 /* =========== VCPU ========== */
+
 #[derive(Copy, Clone, Debug)] 
 pub struct Vcpu {
     id     : usize,
@@ -107,26 +125,51 @@ pub struct Vcpu {
     vm_id  : usize,
 }
 
-
+use crate::vgic::Vgic;
 impl Vcpu {
     pub fn vm(&self) -> Option<Arc<Vm>> { Option::None }
     
     
-    pub fn id(&self) -> usize {0}
-    pub fn vm_id(&self) ->usize {0}
+    pub fn id(&self) -> usize { self.id }
+    pub fn vm_id(&self) ->usize { self.phys_id }
     pub fn phys_id(&self) ->usize {0}
+    
 }
 
 
-/* Current cpu (pcpu) */
+/* ========= Current cpu (pcpu) ============ */
+
+pub struct VcpuArray {
+    array: [Option<Vcpu>; 64],
+    len: usize,
+}
+
+impl VcpuArray {
+    pub const fn new() -> Self {
+        Self {
+            array: [const { None }; 64],
+            len: 0,
+        }
+    }
+
+    #[inline]
+    pub fn pop_vcpu_through_vmid(&self, vm_id: usize) -> Option<&Vcpu> {
+        match self.array.get(vm_id) {
+            Some(vcpu) => vcpu.as_ref(),
+            None => None,
+        }
+    }
+}
 
 pub struct Pcpu {
-    pub active_vcpu  : Option<Vcpu>
+    pub active_vcpu  : Option<Vcpu>,
+    pub vcpu_array   : VcpuArray
 }
 
 pub fn current_cpu() -> Pcpu {
-    Pcpu { 
-        active_vcpu: None
+    Pcpu {
+        active_vcpu: None,
+        vcpu_array: VcpuArray::new()
     }
 }
 
@@ -135,9 +178,7 @@ impl Pcpu {
     pub fn get_gpr(&self, idx: usize) -> usize {0} 
     pub fn set_gpr(&self, idx: usize, val: usize) {}
     pub fn active_vcpu(&self) -> Vcpu {Vcpu { id: 0, vm_id: 0, phys_id: 0 }}
- }
-
-
+}
 
 
 pub fn active_vm_id() -> usize {0}
@@ -147,14 +188,12 @@ pub fn active_vm_ncpu() -> usize {0}
 
 
 
-
-#[allow(non_camel_case_types)]
-#[derive(Debug, Clone)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum EmuDeviceType {
-    EMU_DEVICE_T_CONSOLE,
-    EMU_DEVICE_T_GICD,
+    // Variants representing different emulator device types.
+    EmuDeviceTConsole = 0,
+    EmuDeviceTGicd = 1,
 }
-
 
 pub trait EmuDev {
     fn emu_type(&self) -> EmuDeviceType;
@@ -199,8 +238,7 @@ pub struct IpiMessage {
 }
 
 /* ================= ctx =============== */
-#[derive(Debug, Clone, Copy)]
-pub struct EmuContext {
+#[derive(Debug, Clone, Copy)] pub struct EmuContext {
     pub address: usize,
     pub width: usize,
     pub write: bool,
