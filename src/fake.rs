@@ -5,7 +5,7 @@
 // };
 use core::{fmt::Error, ops::Range};
 extern crate alloc;
-use alloc::sync::Arc;
+use alloc::sync::{Arc, Weak};
 
 #[derive(Copy, Clone, Debug)]
 pub enum IrqState {
@@ -40,26 +40,56 @@ pub fn gic_is_priv(int_id: usize) -> bool {
     int_id < 32
 }
 
+/* ============================================================================ */
+/* ============================================================================ */
 /* ========== VM =========== */
+/* ============================================================================ */
+/* ============================================================================ */
 
 use alloc::vec::Vec;
+use crate::vgic::Vgic;
+
+use crate::vgic_traits::*;
+
+#[derive(Clone)]
 pub struct Vm {
     pub id: usize,
-    pub vcpu_list: Vec<Vcpu>
+    pub vcpu_list: Vec<Vcpu>,
+    pub emu_devs: Vec<Arc<dyn EmuDev>>,
 }
 
+unsafe impl Sync for Vm {}
+unsafe impl Send for Vm {}
+
+
 impl Vm {
+    pub fn new(id: usize) -> Self{
+        Vm { id: id, vcpu_list: Vec::new(), emu_devs: Vec::new() }
+    }
     pub fn id(&self) -> usize {
         self.id
     }
-    pub fn vcpu(&self, id :usize) -> Option<Vcpu> {
-        self.vcpu_list.get(id).copied()
+    #[inline]
+    pub fn vcpu_list(&self) -> &[Vcpu] { &self.vcpu_list }
+    pub fn vcpu(&self, id :usize) -> Option<&Vcpu> {
+        match self.vcpu_list().get(id) {
+            Some(vcpu) => {
+                assert_eq!(id, vcpu.id());
+                Some(vcpu)
+            }
+            None => {
+                log::error!(
+                    "vcpu idx {} is to large than vcpu_list len {}",
+                    id,
+                    self.vcpu_list().len()
+                );
+                None
+            }
+        }
     }
-    pub fn cpu_num(&self) -> usize {
-        self.vcpu_list.len()
-    }
-    pub fn has_interrupt(&self, id: usize) -> bool {false}
-    pub fn emu_has_interrupt(&self, id: usize) -> bool {false}
+    pub fn cpu_num(&self) -> usize { self.vcpu_list.len() }
+    pub fn has_interrupt(&self, _id: usize) -> bool {true}
+    pub fn emu_has_interrupt(&self, _id: usize) -> bool {true}
     /*
     pub fn emu_has_interrupt(&self, int_id: usize) -> bool {
         for emu_dev in self.config().emulated_device_list() {
@@ -74,17 +104,13 @@ impl Vm {
         Vgic::new(1, 1, 1)
     }
 
-    #[inline]
-    pub fn vcpu_list(&self) -> &[Vcpu] {
-        &self.vcpu_list
-    }
 
     pub fn vcpuid_to_pcpuid(&self, vcpuid: usize) -> Result<usize, ()> {
-        self.vcpu_list().get(vcpuid).map(|vcpu| vcpu.phys_id()).ok_or(())
+        self.vcpu_list.get(vcpuid).map(|vcpu| vcpu.phys_id()).ok_or(())
     }
 
     pub fn pcpuid_to_vcpuid(&self, pcpuid: usize) -> Result<usize, ()> {
-        for vcpu in self.vcpu_list() {
+        for vcpu in &self.vcpu_list {
             if vcpu.phys_id() == pcpuid {
                 return Ok(vcpu.id());
             }
@@ -115,29 +141,37 @@ impl Vm {
     }
 }
 
+/* ============================================================================ */
+/* ============================================================================ */
+/* ================= VCPU ================ */
+/* ============================================================================ */
+/* ============================================================================ */
 
-/* =========== VCPU ========== */
+#[derive(Clone, Debug)] pub struct Vcpu {
+    pub id      : usize,
+    pub phys_id : usize,
+    pub vm_id   : usize,
 
-#[derive(Copy, Clone, Debug)] 
-pub struct Vcpu {
-    id     : usize,
-    phys_id: usize,
-    vm_id  : usize,
-}
-
-use crate::vgic::Vgic;
-impl Vcpu {
-    pub fn vm(&self) -> Option<Arc<Vm>> { Option::None }
-    
-    
-    pub fn id(&self) -> usize { self.id }
-    pub fn vm_id(&self) ->usize { self.phys_id }
-    pub fn phys_id(&self) ->usize {0}
-    
+    /* ipi use  */
+    /* VgicInt::owner_vm use */
+    pub vm      : Weak<Vm>,
 }
 
 
+impl VcpuTrait<Vm> for  Vcpu {
+    fn vm(&self) -> Option<Arc<Vm>> { self.vm.upgrade() }
+    
+    fn id(&self) -> usize { self.id }
+    fn vm_id(&self) ->usize { self.vm_id }
+    fn phys_id(&self) ->usize { self.phys_id }
+}
+
+
+/* ============================================================================ */
+/* ============================================================================ */
 /* ========= Current cpu (pcpu) ============ */
+/* ============================================================================ */
+/* ============================================================================ */
 
 pub struct VcpuArray {
     array: [Option<Vcpu>; 64],
@@ -161,31 +195,62 @@ impl VcpuArray {
     }
 }
 
-pub struct Pcpu {
+
+pub struct Pcpu  {
+    /* ipi */
+    /* maintence */
+    /* xxx_access */
+
     pub active_vcpu  : Option<Vcpu>,
-    pub vcpu_array   : VcpuArray
+    
+    /* only ipi use */
+    pub vcpu_array   : VcpuArray,
 }
 
 pub fn current_cpu() -> Pcpu {
     Pcpu {
         active_vcpu: None,
-        vcpu_array: VcpuArray::new()
+        vcpu_array: VcpuArray::new(),
     }
 }
 
-impl Pcpu {
-    pub fn id(&self) -> usize { 0 }
-    pub fn get_gpr(&self, idx: usize) -> usize {0} 
-    pub fn set_gpr(&self, idx: usize, val: usize) {}
-    pub fn active_vcpu(&self) -> Vcpu {Vcpu { id: 0, vm_id: 0, phys_id: 0 }}
+
+/* 实现trait */
+impl PcpuTrait<Vcpu>  for Pcpu {
+    fn id(&self) -> usize { 0 }
+    // reg_access use only
+    fn get_gpr(&self, idx: usize) -> usize {0} 
+    // reg_access use only
+    fn set_gpr(&self, idx: usize, val: usize) {}
+}
+
+/* nothing */
+pub fn active_vm_id() -> usize {
+    let vm = active_vm().unwrap();
+    vm.id()
+}
+/* nothing */
+pub fn active_vm() -> Option<Arc<Vm>> {
+    match current_cpu().active_vcpu.as_ref() {
+        None => None,
+        Some(active_vcpu) => active_vcpu.vm(),
+    } 
 }
 
 
-pub fn active_vm_id() -> usize {0}
-pub fn active_vm() -> Option<Vm> { Option::None }
+/* only ipi emu_sgiregs_access use */
 pub fn active_vcpu_id() -> usize {0}
+/* only ipi emu_sgiregs_access use */
 pub fn active_vm_ncpu() -> usize {0}
 
+
+/* ============================================================================ */
+/* ============================================================================ */
+/* ============================================================================ */
+/*   =============================================  Nothing =================   */
+/* ============================================================================ */
+/* ============================================================================ */
+/* ============================================================================ */
 
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -237,14 +302,5 @@ pub struct IpiMessage {
     pub ipi_message: IpiInnerMsg,
 }
 
-/* ================= ctx =============== */
-#[derive(Debug, Clone, Copy)] pub struct EmuContext {
-    pub address: usize,
-    pub width: usize,
-    pub write: bool,
-    pub sign_ext: bool,
-    pub reg: usize,
-    pub reg_width: usize,
-}
-
+pub use emu_dev::EmuContext;
 

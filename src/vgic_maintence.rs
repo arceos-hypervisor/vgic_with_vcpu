@@ -8,9 +8,14 @@ use crate::vint::*;
 use crate::consts::*;
 use crate::GicHypervisorInterface;
 use arm_gic::gic_v2::GicDistributor;
-use crate::utils::{bit_extract, bit_get, bit_set, bitmap_find_nth};
+use crate::utils::{bit_extract, bitmap_find_nth};
 
 use crate::fake::*;
+
+
+use crate::vgic_traits::VcpuTrait;
+
+
 // for maintenance
 impl Vgic {
     // vcpu_id

@@ -11,6 +11,9 @@ use spin::Mutex;
 use crate::consts::*;
 use crate::fake::*;
 
+use crate::vgic_traits::PcpuTrait;
+use crate::vgic_traits::VcpuTrait;
+
 pub struct VgicInt {
     inner_const: VgicIntInnerConst,
     inner: Mutex<VgicIntInnerMut>,

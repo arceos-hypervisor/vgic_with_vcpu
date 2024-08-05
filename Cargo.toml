@@ -9,3 +9,6 @@ tock-registers = "0.8"
 spin = { version = "0.9.4", features = ["use_ticket_mutex"] }
 arm_gic = { path = "../../arceos/crates/arm_gic" }
 # serde = { version = "1.0.201", features = ["derive"] }
+axsync = { path = "../../arceos/modules/axsync" }
+emu_dev = { path = "../emu_dev" }
+log = "=0.4.19"

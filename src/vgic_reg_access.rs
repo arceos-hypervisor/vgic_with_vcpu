@@ -13,6 +13,11 @@ use core::ops::Range;
 
 use crate::fake::*;
 
+
+
+use crate::vgic_traits::PcpuTrait;
+
+
 pub fn vgicd_emu_access_is_vaild(emu_ctx: &EmuContext) -> bool {
     let offset = emu_ctx.address & 0xfff;
     let offset_prefix = (offset & 0xf80) >> 7;
@@ -64,7 +69,8 @@ impl Vgic {
                 } else {
                     GicHypervisorInterface::set_hcr(hcr & !1);
                 }
-
+                // TODO:
+                /*
                 let m = IpiInitcMessage {
                     event: InitcEvent::VgicdGichEn,
                     vm_id: active_vm_id(),
@@ -72,7 +78,8 @@ impl Vgic {
                     val: enable as u8,
                 };
                 //  Ensure all processors are synchronously updated when there is a change in Ctrl state.
-                // TODO: ipi_intra_broadcast_msg(&active_vm().unwrap(), IpiType::IpiTIntc, IpiInnerMsg::Initc(m));
+                ipi_intra_broadcast_msg(&active_vm().unwrap(), IpiType::IpiTIntc, IpiInnerMsg::Initc(m));
+                */
             }
         } else {
             let idx = emu_ctx.reg;
@@ -288,10 +295,10 @@ impl Vgic {
                 }
             }
             if first_int >= 16 && !vm_has_interrupt_flag {
-                // warn!(
-                //     "emu_icenabler_access: vm[{}] does not have interrupt {}",
-                //     vm_id, first_int
-                // );
+                log::warn!(
+                    "emu_icenabler_access: vm[{}] does not have interrupt {}",
+                    vm_id, first_int
+                );
                 return;
             }
         }
@@ -409,14 +416,14 @@ impl Vgic {
 
                 for i in 0..8 {
                     if trgtlist & (1 << i) != 0 {
+                        //TODO
+                        /*
                         let m = IpiInitcMessage {
                             event: InitcEvent::VgicdSetPend,
                             vm_id: active_vm_id(),
                             int_id: (bit_extract(val, 0, 8) | (active_vcpu_id() << 10)) as u16,
                             val: true as u8,
                         };
-                        //TODO
-                        /*
                         if !ipi_send_msg(i, IpiType::IpiTIntc, IpiInnerMsg::Initc(m)) {
                             // error!(
                             //     "emu_sgiregs_access: Failed to send ipi message, target {} type {}",

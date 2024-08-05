@@ -57,13 +57,17 @@ use crate::config;
 use crate::fake::*;
 use arm_gic::gic_v2::GicDistributor;
 
-struct Vgicd {
+use crate::vgic_traits::PcpuTrait;
+use crate::vgic_traits::VcpuTrait;
+
+
+pub struct Vgicd {
     // ctlr will be written among different cores, so we use AtomicU32 to guarantee thread safety
     ctlr        : AtomicU32,
     // Others will be read only and only be written when initializings
     typer       : u32,
     iidr        : u32,
-    interrupts  : Vec<VgicInt>,
+    pub interrupts  : Vec<VgicInt>,
 }
 
 impl Vgicd {
@@ -83,7 +87,7 @@ impl Vgicd {
 
 pub struct Vgic {
     pub address_range: Range<usize>,
-    vgicd: Vgicd,
+    pub vgicd: Vgicd,
     pub cpu_priv: Vec<vint_private::VgicCpuPriv>,  // 0..32
 }
 
@@ -944,73 +948,29 @@ fn gich_get_lr(interrupt: &VgicInt) -> Option<u32> {
     None
 }
 
-pub fn vgic_ipi_handler(msg: IpiMessage) {
-    if let IpiInnerMsg::Initc(intc) = msg.ipi_message {
-        let vm_id = intc.vm_id;
-        let int_id = intc.int_id;
-        let val = intc.val;
-        let array = current_cpu().vcpu_array;
-        let trgt_vcpu = match array.pop_vcpu_through_vmid(vm_id) {
-            None => {
-                // error!("Core {} received vgic msg from unknown VM {}", current_cpu().id, vm_id);
-                return;
-            }
-            Some(vcpu) => vcpu,
-        };
-        // TODO: restore_vcpu_gic(current_cpu().active_vcpu.clone(), trgt_vcpu.clone());
 
-        let vm = match trgt_vcpu.vm() {
-            None => {
-                panic!("vgic_ipi_handler: vm is None");
-            }
-            Some(x) => x,
-        };
-        let vgic = vm.vgic();
+pub fn vgic_set_hw_int(vm: &Vm, int_id: usize) {
+    // soft
+    if int_id < GIC_SGIS_NUM {
+        return;
+    }
 
-        if vm_id != vm.id() {
-            // error!("VM {} received vgic msg from another vm {}", vm.id(), vm_id);
-            return;
-        }
-        match intc.event {
-            InitcEvent::VgicdGichEn => {
-                let hcr = GicHypervisorInterface::hcr();
-                if val != 0 {
-                    GicHypervisorInterface::set_hcr(hcr | 0b1);
-                } else {
-                    GicHypervisorInterface::set_hcr(hcr & !0b1);
-                }
-            }
-            InitcEvent::VgicdSetEn => {
-                vgic.set_enable(trgt_vcpu, int_id as usize, val != 0);
-            }
-            InitcEvent::VgicdSetPend => {
-                vgic.set_pend(trgt_vcpu, int_id as usize, val != 0);
-            }
-            InitcEvent::VgicdSetPrio => {
-                vgic.set_prio(trgt_vcpu, int_id as usize, val);
-            }
-            InitcEvent::VgicdSetTrgt => {
-                vgic.set_trgt(trgt_vcpu, int_id as usize, val);
-            }
-            InitcEvent::VgicdRoute => {
-                if let Some(interrupt) = vgic.get_int(trgt_vcpu, bit_extract(int_id as usize, 0, 10)) {
-                    let interrupt_lock = interrupt.lock.lock();
-                    if vgic_int_get_owner(trgt_vcpu, interrupt) {
-                        if (interrupt.targets() & (1 << current_cpu().id())) != 0 {
-                            vgic.add_lr(trgt_vcpu, interrupt);
-                        }
-                        vgic_int_yield_owner(trgt_vcpu, interrupt);
-                    }
-                    drop(interrupt_lock);
-                }
-            }
-            _ => {
-                // error!("vgic_ipi_handler: core {} received unknown event", current_cpu().id)
+    let vgic = vm.vgic();
+
+    // ppi
+    if int_id < GIC_PRIVINT_NUM {
+        for i in 0..vm.cpu_num() {
+            if let Some(interrupt) = vgic.get_int(&vm.vcpu(i).unwrap(), int_id) {
+                let interrupt_lock = interrupt.lock.lock();
+                interrupt.set_hw(true);
+                drop(interrupt_lock);
             }
         }
-        //TODO: save_vcpu_gic(current_cpu().active_vcpu.clone(), trgt_vcpu);
-    } else {
-        // error!("vgic_ipi_handler: illegal ipi");
+    // spi
+    } else if let Some(interrupt) = vgic.get_int(&vm.vcpu(0).unwrap(), int_id) {
+        let interrupt_lock = interrupt.lock.lock();
+        interrupt.set_hw(true);
+        drop(interrupt_lock);
     }
 }
 
@@ -1042,33 +1002,6 @@ pub fn emu_intc_init(base_ipa: usize, length: usize, vcpu_list: &[Vcpu]) -> Resu
 
     Ok(Arc::new(vgic))
 }
-
-pub fn vgic_set_hw_int(vm: &Vm, int_id: usize) {
-    // soft
-    if int_id < GIC_SGIS_NUM {
-        return;
-    }
-
-    let vgic = vm.vgic();
-
-    // ppi
-    if int_id < GIC_PRIVINT_NUM {
-        for i in 0..vm.cpu_num() {
-            if let Some(interrupt) = vgic.get_int(&vm.vcpu(i).unwrap(), int_id) {
-                let interrupt_lock = interrupt.lock.lock();
-                interrupt.set_hw(true);
-                drop(interrupt_lock);
-            }
-        }
-    // spi
-    } else if let Some(interrupt) = vgic.get_int(&vm.vcpu(0).unwrap(), int_id) {
-        let interrupt_lock = interrupt.lock.lock();
-        interrupt.set_hw(true);
-        drop(interrupt_lock);
-    }
-}
-
-
 
 
 /* Do this in config */
