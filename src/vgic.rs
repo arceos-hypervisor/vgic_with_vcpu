@@ -187,7 +187,7 @@ impl Vgic {
 
 impl Vgic {
     /// can use vcpu_id
-    pub fn get_int(&self, vcpu: &Vcpu, int_id: usize) -> Option<&VgicInt> {
+    pub fn get_int<T: VcpuTrait<Vm>>(&self, vcpu: &T, int_id: usize) -> Option<&VgicInt> {
         if int_id < GIC_PRIVINT_NUM {
             let vcpu_id = vcpu.id();
             self.cpu_priv_interrupt(vcpu_id, int_id)
@@ -199,7 +199,7 @@ impl Vgic {
     }
 
     // vcpu_id
-    fn remove_lr(&self, vcpu: &Vcpu, interrupt: &VgicInt) -> bool {
+    fn remove_lr<T: VcpuTrait<Vm>>(&self, vcpu: &T, interrupt: &VgicInt) -> bool {
         if !vgic_owns(vcpu, interrupt) { // 查看中断是否属于该 vcpu 
             return false;
         }
@@ -255,7 +255,7 @@ impl Vgic {
         false
     }
 
-    pub fn add_lr(&self, vcpu: &Vcpu, interrupt: &VgicInt) -> bool {
+    pub fn add_lr<T: VcpuTrait<Vm>>(&self, vcpu: &T, interrupt: &VgicInt) -> bool {
         if !interrupt.enabled() || interrupt.in_lr() {
             return false;
         }
@@ -335,7 +335,7 @@ impl Vgic {
         false
     }
 
-    pub fn write_lr(&self, vcpu: &Vcpu, interrupt: &VgicInt, lr_ind: usize) {
+    pub fn write_lr<T: VcpuTrait<Vm>>(&self, vcpu: &T, interrupt: &VgicInt, lr_ind: usize) {
         let vcpu_id = vcpu.id();
         let int_id = interrupt.id() as usize;
         let int_prio = interrupt.prio();
@@ -410,7 +410,7 @@ impl Vgic {
         self.update_int_list(vcpu.id(), interrupt);
     }
 
-    fn route(&self, vcpu: &Vcpu, interrupt: &VgicInt) {
+    fn route<T: VcpuTrait<Vm>>(&self, vcpu: &T, interrupt: &VgicInt) {
         let cpu_id = current_cpu().id();
         if let IrqState::IrqSInactive = interrupt.state() {
             return;
@@ -440,7 +440,7 @@ impl Vgic {
         }
     }
 
-    pub fn set_enable(&self, vcpu: &Vcpu, int_id: usize, en: bool) {
+    pub fn set_enable<T: VcpuTrait<Vm>>(&self, vcpu: &T, int_id: usize, en: bool) {
         if int_id < GIC_SGIS_NUM {
             return;
         }
@@ -489,11 +489,11 @@ impl Vgic {
     }
 
     /* nothing */
-    pub fn get_enable(&self, vcpu: &Vcpu, int_id: usize) -> bool {
+    pub fn get_enable<T: VcpuTrait<Vm>>(&self, vcpu: &T, int_id: usize) -> bool {
         self.get_int(vcpu, int_id).unwrap().enabled()
     }
 
-    pub fn set_pend(&self, vcpu: &Vcpu, int_id: usize, pend: bool) {
+    pub fn set_pend<T: VcpuTrait<Vm>>(&self, vcpu: &T, int_id: usize, pend: bool) {
         // TODO: sgi_get_pend ?
         if bit_extract(int_id, 0, 10) < GIC_SGIS_NUM {
             self.sgi_set_pend(vcpu, int_id, pend);
@@ -557,7 +557,7 @@ impl Vgic {
         }
     }
 
-    pub fn set_active(&self, vcpu: &Vcpu, int_id: usize, act: bool) {
+    pub fn set_active<T: VcpuTrait<Vm>>(&self, vcpu: &T, int_id: usize, act: bool) {
         if let Some(interrupt) = self.get_int(vcpu, bit_extract(int_id, 0, 10)) {
             let interrupt_lock = interrupt.lock.lock();
             if vgic_int_get_owner(vcpu, interrupt) {
@@ -601,7 +601,7 @@ impl Vgic {
         }
     }
 
-    pub fn set_icfgr(&self, vcpu: &Vcpu, int_id: usize, cfg: u8) {
+    pub fn set_icfgr<T: VcpuTrait<Vm>>(&self, vcpu: &T, int_id: usize, cfg: u8) {
         if let Some(interrupt) = self.get_int(vcpu, int_id) {
             let interrupt_lock = interrupt.lock.lock();
             if vgic_int_get_owner(vcpu, interrupt) {
@@ -639,7 +639,7 @@ impl Vgic {
         }
     }
 
-    pub fn get_icfgr(&self, vcpu: &Vcpu, int_id: usize) -> u8 {
+    pub fn get_icfgr<T: VcpuTrait<Vm>>(&self, vcpu: &T, int_id: usize) -> u8 {
         if let Some(interrupt) = self.get_int(vcpu, int_id) {
             interrupt.cfg()
         } else {
@@ -647,7 +647,7 @@ impl Vgic {
         }
     }
 
-    fn sgi_set_pend(&self, vcpu: &Vcpu, int_id: usize, pend: bool) {
+    fn sgi_set_pend<T: VcpuTrait<Vm>>(&self, vcpu: &T, int_id: usize, pend: bool) {
         if bit_extract(int_id, 0, 10) > GIC_SGIS_NUM {
             return;
         }
@@ -693,7 +693,7 @@ impl Vgic {
         }
     }
 
-    pub fn set_prio(&self, vcpu: &Vcpu, int_id: usize, mut prio: u8) {
+    pub fn set_prio<T: VcpuTrait<Vm>>(&self, vcpu: &T, int_id: usize, mut prio: u8) {
         if let Some(interrupt) = self.get_int(vcpu, int_id) {
             prio &= 0xf0; // gic-400 only allows 4 priority bits in non-secure state
 
@@ -740,11 +740,11 @@ impl Vgic {
     }
 
     /* nothing  */
-    pub fn get_prio(&self, vcpu: &Vcpu, int_id: usize) -> u8 {
+    pub fn get_prio<T: VcpuTrait<Vm>>(&self, vcpu: &T, int_id: usize) -> u8 {
         self.get_int(vcpu, int_id).unwrap().prio()
     }
 
-    pub fn set_trgt(&self, vcpu: &Vcpu, int_id: usize, trgt: u8) {
+    pub fn set_trgt<T: VcpuTrait<Vm>>(&self, vcpu: &T, int_id: usize, trgt: u8) {
         if let Some(interrupt) = self.get_int(vcpu, int_id) {
             let interrupt_lock = interrupt.lock.lock();
             if vgic_int_get_owner(vcpu, interrupt) {
@@ -792,11 +792,11 @@ impl Vgic {
     }
 
     /* nothing */
-    pub fn get_trgt(&self, vcpu: &Vcpu, int_id: usize) -> u8 {
+    pub fn get_trgt<T: VcpuTrait<Vm>>(&self, vcpu: &T, int_id: usize) -> u8 {
         self.get_int(vcpu, int_id).unwrap().targets()
     }
 
-    pub fn inject(&self, vcpu: &Vcpu, int_id: usize) {
+    pub fn inject<T: VcpuTrait<Vm>>(&self, vcpu: &T, int_id: usize) {
         if let Some(interrupt) = self.get_int(vcpu, bit_extract(int_id, 0, 10)) {
             if interrupt.hw() {
                 let interrupt_lock = interrupt.lock.lock();
@@ -851,7 +851,7 @@ pub fn vgic_target_translate(vm: &Vm, trgt: u32, v2p: bool) -> u32 {
 // vcpu_id, pcpu_id
 // 只考虑 spi 
 // 中断的所有者是当前 vcpu 返回真
-fn vgic_owns(vcpu: &Vcpu, interrupt: &VgicInt) -> bool {
+fn vgic_owns<T: VcpuTrait<Vm>>(vcpu: &T, interrupt: &VgicInt) -> bool {
     // sgi ppi 
     if gic_is_priv(interrupt.id() as usize) {
         return true;
@@ -872,7 +872,7 @@ fn vgic_owns(vcpu: &Vcpu, interrupt: &VgicInt) -> bool {
 
 /// 1、这个int没有owner的话，设置当前vcpu为他的主人  返回真
 /// 2、这个int有owner，返回 owner_vm_id == vcpu_vm_id && owner_vcpu_id == vcpu_id 
-pub fn vgic_int_get_owner(vcpu: &Vcpu, interrupt: &VgicInt) -> bool {
+pub fn vgic_int_get_owner<T: VcpuTrait<Vm>>(vcpu: &T, interrupt: &VgicInt) -> bool {
     let vcpu_id = vcpu.id();
     let vcpu_vm_id = vcpu.vm_id();
 
@@ -919,7 +919,7 @@ pub fn vgic_get_state(interrupt: &VgicInt) -> usize {
 }
 
 // vcpu_id, pcpu_id
-pub fn vgic_int_yield_owner(vcpu: &Vcpu, interrupt: &VgicInt) {
+pub fn vgic_int_yield_owner<T: VcpuTrait<Vm>>(vcpu: &T, interrupt: &VgicInt) {
     if !vgic_owns(vcpu, interrupt) || interrupt.in_lr() || gic_is_priv(interrupt.id() as usize) {
         return;
     }
@@ -947,62 +947,6 @@ fn gich_get_lr(interrupt: &VgicInt) -> Option<u32> {
     }
     None
 }
-
-
-pub fn vgic_set_hw_int(vm: &Vm, int_id: usize) {
-    // soft
-    if int_id < GIC_SGIS_NUM {
-        return;
-    }
-
-    let vgic = vm.vgic();
-
-    // ppi
-    if int_id < GIC_PRIVINT_NUM {
-        for i in 0..vm.cpu_num() {
-            if let Some(interrupt) = vgic.get_int(&vm.vcpu(i).unwrap(), int_id) {
-                let interrupt_lock = interrupt.lock.lock();
-                interrupt.set_hw(true);
-                drop(interrupt_lock);
-            }
-        }
-    // spi
-    } else if let Some(interrupt) = vgic.get_int(&vm.vcpu(0).unwrap(), int_id) {
-        let interrupt_lock = interrupt.lock.lock();
-        interrupt.set_hw(true);
-        drop(interrupt_lock);
-    }
-}
-
-// init intc for a vm
-pub fn emu_intc_init(base_ipa: usize, length: usize, vcpu_list: &[Vcpu]) -> Result<Arc<dyn EmuDev>, ()> {
-
-    let vcpu_num = vcpu_list.len();
-    let mut vgic = Vgic::new(base_ipa, length, vcpu_num);
-
-    for i in 0..GIC_SPI_MAX {
-        vgic.vgicd.interrupts.push(VgicInt::new(i));
-    }
-
-    for vcpu in vcpu_list {
-        let mut cpu_priv = vint_private::VgicCpuPriv::default();
-        for int_idx in 0..GIC_PRIVINT_NUM {
-            let phys_id = vcpu.phys_id();
-
-            cpu_priv.interrupts.push(VgicInt::priv_new(
-                int_idx,
-                vcpu.clone(),
-                1 << phys_id,
-                int_idx < GIC_SGIS_NUM,
-            ));
-        }
-
-        vgic.cpu_priv.push(cpu_priv);
-    }
-
-    Ok(Arc::new(vgic))
-}
-
 
 /* Do this in config */
 

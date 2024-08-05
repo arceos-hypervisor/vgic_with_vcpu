@@ -16,6 +16,7 @@ use crate::fake::*;
 
 
 use crate::vgic_traits::PcpuTrait;
+use crate::vgic_traits::VcpuTrait;
 
 
 pub fn vgicd_emu_access_is_vaild(emu_ctx: &EmuContext) -> bool {
@@ -56,11 +57,11 @@ pub fn vgicd_emu_access_is_vaild(emu_ctx: &EmuContext) -> bool {
 impl Vgic {
     /* set gpr get gpr */
     /* 找到当前活跃 vm ，向其vcpu发送ipi，保证ctrlr同步 */
-    fn emu_ctrl_access(&self, emu_ctx: &EmuContext) {
+    fn emu_ctrl_access<T: VcpuTrait<Vm>> (&self, emu_ctx: &EmuContext, vcpu: &T) {
         if emu_ctx.write {
             let prev_ctlr = self.vgicd_ctlr();
             let idx = emu_ctx.reg;
-            self.set_vgicd_ctlr(current_cpu().get_gpr(idx) as u32 & 0x1);
+            self.set_vgicd_ctlr(vcpu.get_gpr(idx) as u32 & 0x1);
             if prev_ctlr ^ self.vgicd_ctlr() != 0 {
                 let enable = self.vgicd_ctlr() != 0;
                 let hcr = GicHypervisorInterface::hcr();
@@ -84,27 +85,27 @@ impl Vgic {
         } else {
             let idx = emu_ctx.reg;
             let val = self.vgicd_ctlr() as usize;
-            current_cpu().set_gpr(idx, val);
+            vcpu.set_gpr(idx, val);
         }
     }
 
     /* set gpr get gpr */
-    fn emu_typer_access(&self, emu_ctx: &EmuContext) {
+    fn emu_typer_access<T: VcpuTrait<Vm>> (&self, emu_ctx: &EmuContext, vcpu: &T) {
         if !emu_ctx.write {
             let idx = emu_ctx.reg;
             let val = self.vgicd_typer() as usize;
-            current_cpu().set_gpr(idx, val);
+            vcpu.set_gpr(idx, val);
         } else {
             // warn!("emu_typer_access: can't write to RO reg");
         }
     }
 
     /* set gpr get gpr */
-    fn emu_iidr_access(&self, emu_ctx: &EmuContext) {
+    fn emu_iidr_access<T: VcpuTrait<Vm>> (&self, emu_ctx: &EmuContext, vcpu: &T) {
         if !emu_ctx.write {
             let idx = emu_ctx.reg;
             let val = self.vgicd_iidr() as usize;
-            current_cpu().set_gpr(idx, val);
+            vcpu.set_gpr(idx, val);
         } else {
             // warn!("emu_iidr_access: can't write to RO reg");
         }
@@ -112,11 +113,11 @@ impl Vgic {
 
     /* set gpr get gpr */
     /*  */
-    fn emu_isenabler_access(&self, emu_ctx: &EmuContext) {
+    fn emu_isenabler_access<T: VcpuTrait<Vm>> (&self, emu_ctx: &EmuContext, vcpu: &T) {
         // println!("DEBUG: in emu_isenabler_access");
         let reg_idx = (emu_ctx.address & 0b1111111) / 4;
         let idx = emu_ctx.reg;
-        let mut val = if emu_ctx.write { current_cpu().get_gpr(idx) } else { 0 };
+        let mut val = if emu_ctx.write { vcpu.get_gpr(idx) } else { 0 };
         let first_int = reg_idx * 32;
         let vm_id = active_vm_id();
         let vm = match active_vm() {
@@ -154,18 +155,19 @@ impl Vgic {
                 }
             }
             let idx = emu_ctx.reg;
-            current_cpu().set_gpr(idx, val);
+            vcpu.set_gpr(idx, val);
         }
     }
 
     /* set gpr get gpr */
     /*  */
-    fn emu_pendr_access(&self, emu_ctx: &EmuContext, set: bool) {
+    fn emu_pendr_access<T: VcpuTrait<Vm>> (&self, emu_ctx: &EmuContext, set: bool, vcpu: &T) {
         // trace!("emu_pendr_access");
         let reg_idx = (emu_ctx.address & 0b1111111) / 4;
         let idx = emu_ctx.reg;
-        let mut val = if emu_ctx.write { current_cpu().get_gpr(idx) } else { 0 };
+        let mut val = if emu_ctx.write { vcpu.get_gpr(idx) } else { 0 };
         let first_int = reg_idx * 32;
+        vcpu.vm();
         let vm_id = active_vm_id();
         let vm = match active_vm() {
             Some(vm) => vm,
@@ -206,20 +208,20 @@ impl Vgic {
                 }
             }
             let idx = emu_ctx.reg;
-            current_cpu().set_gpr(idx, val);
+            vcpu.set_gpr(idx, val);
         }
     }
 
     /* nothing */
-    fn emu_ispendr_access(&self, emu_ctx: &EmuContext) {
-        self.emu_pendr_access(emu_ctx, true);
+    fn emu_ispendr_access<T: VcpuTrait<Vm>> (&self, emu_ctx: &EmuContext, vcpu: &T) {
+        self.emu_pendr_access(emu_ctx, true, vcpu);
     }
 
-    fn emu_activer_access(&self, emu_ctx: &EmuContext, set: bool) {
+    fn emu_activer_access<T: VcpuTrait<Vm>> (&self, emu_ctx: &EmuContext, set: bool, vcpu: &T) {
         // println!("DEBUG: in emu_activer_access");
         let reg_idx = (emu_ctx.address & 0b1111111) / 4;
         let idx = emu_ctx.reg;
-        let mut val = if emu_ctx.write { current_cpu().get_gpr(idx) } else { 0 };
+        let mut val = if emu_ctx.write { vcpu.get_gpr(idx) } else { 0 };
         let first_int = reg_idx * 32;
         let vm_id = active_vm_id();
         let vm = match active_vm() {
@@ -264,19 +266,19 @@ impl Vgic {
                 }
             }
             let idx = emu_ctx.reg;
-            current_cpu().set_gpr(idx, val);
+            vcpu.set_gpr(idx, val);
         }
     }
 
     /* nothing */
-    fn emu_isactiver_access(&self, emu_ctx: &EmuContext) {
-        self.emu_activer_access(emu_ctx, true);
+    fn emu_isactiver_access<T: VcpuTrait<Vm>> (&self, emu_ctx: &EmuContext, vcpu: &T) {
+        self.emu_activer_access(emu_ctx, true, vcpu);
     }
 
-    fn emu_icenabler_access(&self, emu_ctx: &EmuContext) {
+    fn emu_icenabler_access<T: VcpuTrait<Vm>> (&self, emu_ctx: &EmuContext, vcpu: &T) {
         let reg_idx = (emu_ctx.address & 0b1111111) / 4;
         let idx = emu_ctx.reg;
-        let mut val = if emu_ctx.write { current_cpu().get_gpr(idx) } else { 0 };
+        let mut val = if emu_ctx.write { vcpu.get_gpr(idx) } else { 0 };
         let first_int = reg_idx * 32;
         let vm_id = active_vm_id();
         let vm = match active_vm() {
@@ -316,21 +318,21 @@ impl Vgic {
                 }
             }
             let idx = emu_ctx.reg;
-            current_cpu().set_gpr(idx, val);
+            vcpu.set_gpr(idx, val);
         }
     }
 
     /* nothing */
-    fn emu_icpendr_access(&self, emu_ctx: &EmuContext) {
-        self.emu_pendr_access(emu_ctx, false);
+    fn emu_icpendr_access<T: VcpuTrait<Vm>> (&self, emu_ctx: &EmuContext, vcpu: &T) {
+        self.emu_pendr_access(emu_ctx, false, vcpu);
     }
 
     /* nothing */
-    fn emu_icativer_access(&self, emu_ctx: &EmuContext) {
-        self.emu_activer_access(emu_ctx, false);
+    fn emu_icativer_access<T: VcpuTrait<Vm>> (&self, emu_ctx: &EmuContext, vcpu: &T) {
+        self.emu_activer_access(emu_ctx, false, vcpu);
     }
 
-    fn emu_icfgr_access(&self, emu_ctx: &EmuContext) {
+    fn emu_icfgr_access<T: VcpuTrait<Vm>> (&self, emu_ctx: &EmuContext, vcpu: &T) {
         let first_int = (32 / GIC_CONFIG_BITS) * bit_extract(emu_ctx.address, 0, 9) / 4;
         let vm_id = active_vm_id();
         let vm = match active_vm() {
@@ -356,7 +358,7 @@ impl Vgic {
 
         if emu_ctx.write {
             let idx = emu_ctx.reg;
-            let cfg = current_cpu().get_gpr(idx);
+            let cfg = vcpu.get_gpr(idx);
             let mut irq = first_int;
             let mut bit = 0;
             while bit < emu_ctx.width * 8 {
@@ -379,13 +381,13 @@ impl Vgic {
             }
             let idx = emu_ctx.reg;
             let val = cfg;
-            current_cpu().set_gpr(idx, val);
+            vcpu.set_gpr(idx, val);
         }
     }
 
-    fn emu_sgiregs_access(&self, emu_ctx: &EmuContext) {
+    fn emu_sgiregs_access<T: VcpuTrait<Vm>> (&self, emu_ctx: &EmuContext, vcpu: &T) {
         let idx = emu_ctx.reg;
-        let val = if emu_ctx.write { current_cpu().get_gpr(idx) } else { 0 };
+        let val = if emu_ctx.write { vcpu.get_gpr(idx) } else { 0 };
         let vm = match active_vm() {
             Some(vm) => vm,
             None => {
@@ -440,9 +442,9 @@ impl Vgic {
         }
     }
 
-    fn emu_ipriorityr_access(&self, emu_ctx: &EmuContext) {
+    fn emu_ipriorityr_access<T: VcpuTrait<Vm>>(&self, emu_ctx: &EmuContext, vcpu: &T) {
         let idx = emu_ctx.reg;
-        let mut val = if emu_ctx.write { current_cpu().get_gpr(idx) } else { 0 };
+        let mut val = if emu_ctx.write { vcpu.get_gpr(idx) } else { 0 };
         let first_int = (8 / GIC_PRIO_BITS) * bit_extract(emu_ctx.address, 0, 9);
         let vm_id = active_vm_id();
         let vm = match active_vm() {
@@ -483,13 +485,13 @@ impl Vgic {
                     << (GIC_PRIO_BITS * i);
             }
             let idx = emu_ctx.reg;
-            current_cpu().set_gpr(idx, val);
+            vcpu.set_gpr(idx, val);
         }
     }
 
-    fn emu_itargetr_access(&self, emu_ctx: &EmuContext) {
+    fn emu_itargetr_access<T: VcpuTrait<Vm>>(&self, emu_ctx: &EmuContext, vcpu: &T) {
         let idx = emu_ctx.reg;
-        let mut val = if emu_ctx.write { current_cpu().get_gpr(idx) } else { 0 };
+        let mut val = if emu_ctx.write { vcpu.get_gpr(idx) } else { 0 };
         let first_int = (8 / GIC_TARGET_BITS) * bit_extract(emu_ctx.address, 0, 9);
 
         if emu_ctx.write {
@@ -508,7 +510,7 @@ impl Vgic {
             }
             val = vgic_target_translate(&active_vm().unwrap(), val as u32, false) as usize;
             let idx = emu_ctx.reg;
-            current_cpu().set_gpr(idx, val);
+            vcpu.set_gpr(idx, val);
         }
     }
 
@@ -516,7 +518,8 @@ impl Vgic {
 }
 
 
-impl EmuDev for Vgic {
+impl Vgic {
+
     fn emu_type(&self) -> EmuDeviceType {
         EmuDeviceType::EmuDeviceTGicd
     }
@@ -525,7 +528,7 @@ impl EmuDev for Vgic {
         self.address_range.clone()
     }
 
-    fn handler(&self, emu_ctx: &EmuContext) -> bool {
+    pub fn handler<T: VcpuTrait<Vm>>(&self, emu_ctx: &EmuContext, ctx: &T) -> bool {
         let offset = emu_ctx.address & 0xfff;
 
         let vgicd_offset_prefix = offset >> 7;
@@ -542,53 +545,53 @@ impl EmuDev for Vgic {
         // );
         match vgicd_offset_prefix {
             VGICD_REG_OFFSET_PREFIX_ISENABLER => {
-                self.emu_isenabler_access(emu_ctx);
+                self.emu_isenabler_access(emu_ctx, ctx);
             }
             VGICD_REG_OFFSET_PREFIX_ISPENDR => {
-                self.emu_ispendr_access(emu_ctx);
+                self.emu_ispendr_access(emu_ctx, ctx);
             }
             VGICD_REG_OFFSET_PREFIX_ISACTIVER => {
-                self.emu_isactiver_access(emu_ctx);
+                self.emu_isactiver_access(emu_ctx, ctx);
             }
             VGICD_REG_OFFSET_PREFIX_ICENABLER => {
-                self.emu_icenabler_access(emu_ctx);
+                self.emu_icenabler_access(emu_ctx, ctx);
             }
             VGICD_REG_OFFSET_PREFIX_ICPENDR => {
-                self.emu_icpendr_access(emu_ctx);
+                self.emu_icpendr_access(emu_ctx, ctx);
             }
             VGICD_REG_OFFSET_PREFIX_ICACTIVER => {
-                self.emu_icativer_access(emu_ctx);
+                self.emu_icativer_access(emu_ctx, ctx);
             }
             VGICD_REG_OFFSET_PREFIX_ICFGR => {
-                self.emu_icfgr_access(emu_ctx);
+                self.emu_icfgr_access(emu_ctx, ctx);
             }
             VGICD_REG_OFFSET_PREFIX_SGIR => {
-                self.emu_sgiregs_access(emu_ctx);
+                self.emu_sgiregs_access(emu_ctx, ctx);
             }
             _ => {
                 match offset {
                     // VGICD_REG_OFFSET(CTLR)
                     0 => {
-                        self.emu_ctrl_access(emu_ctx);
+                        self.emu_ctrl_access(emu_ctx, ctx);
                     }
                     // VGICD_REG_OFFSET(TYPER)
                     0x004 => {
-                        self.emu_typer_access(emu_ctx);
+                        self.emu_typer_access(emu_ctx, ctx);
                     }
                     // VGICD_REG_OFFSET(IIDR)
                     0x008 => {
-                        self.emu_iidr_access(emu_ctx);
+                        self.emu_iidr_access(emu_ctx, ctx);
                     }
                     _ => {
                         if !emu_ctx.write {
-                            current_cpu().set_gpr(emu_ctx.reg, 0);
+                            ctx.set_gpr(emu_ctx.reg, 0);
                         }
                     }
                 }
                 if (0x400..0x800).contains(&offset) {
-                    self.emu_ipriorityr_access(emu_ctx);
+                    self.emu_ipriorityr_access(emu_ctx, ctx);
                 } else if (0x800..0xc00).contains(&offset) {
-                    self.emu_itargetr_access(emu_ctx);
+                    self.emu_itargetr_access(emu_ctx, ctx);
                 }
             }
         }

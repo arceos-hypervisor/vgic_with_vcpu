@@ -55,7 +55,7 @@ use crate::vgic_traits::*;
 pub struct Vm {
     pub id: usize,
     pub vcpu_list: Vec<Vcpu>,
-    pub emu_devs: Vec<Arc<dyn EmuDev>>,
+    pub emu_devs: Vec<Arc<Vgic>>,
 }
 
 unsafe impl Sync for Vm {}
@@ -164,8 +164,10 @@ impl VcpuTrait<Vm> for  Vcpu {
     fn id(&self) -> usize { self.id }
     fn vm_id(&self) ->usize { self.vm_id }
     fn phys_id(&self) ->usize { self.phys_id }
-}
 
+    fn get_gpr(&self, idx: usize) -> usize {0}
+    fn set_gpr(&self, idx: usize, val: usize) {}
+}
 
 /* ============================================================================ */
 /* ============================================================================ */
@@ -218,10 +220,6 @@ pub fn current_cpu() -> Pcpu {
 /* 实现trait */
 impl PcpuTrait<Vcpu>  for Pcpu {
     fn id(&self) -> usize { 0 }
-    // reg_access use only
-    fn get_gpr(&self, idx: usize) -> usize {0} 
-    // reg_access use only
-    fn set_gpr(&self, idx: usize, val: usize) {}
 }
 
 /* nothing */
@@ -260,13 +258,6 @@ pub enum EmuDeviceType {
     EmuDeviceTGicd = 1,
 }
 
-pub trait EmuDev {
-    fn emu_type(&self) -> EmuDeviceType;
-
-    fn address_range(&self) -> Range<usize>;
-
-    fn handler(&self, emu_ctx: &EmuContext) -> bool;
-}
 
 /* ================ IPI relevant =============== */
 

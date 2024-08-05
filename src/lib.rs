@@ -30,11 +30,12 @@ use crate::config::VgicGlobal;
 use arm_gic::gic_v2::GicDistributor;
 use crate::vgic_maintence::gic_maintenance_handler;
 use crate::vgic::vgic_set_hw_int;
-use crate::vgic::emu_intc_init;
+// use crate::vgic::emu_intc_init;
 use crate::vint::*;
 use crate::consts::*;
 use alloc::sync::Arc;
 
+use crate::vgic_traits::VcpuTrait;
 
 use lazy_static::lazy_static;
 use axsync::Mutex;
@@ -43,6 +44,62 @@ lazy_static! {
     pub static ref VM1: Mutex<Vm> = Mutex::new(Vm::new(1));
 }
 use alloc::sync::Weak;
+
+
+// init intc for a vm
+pub fn emu_intc_init(base_ipa: usize, length: usize, vcpu_list: &[Vcpu]) -> Result<Arc<Vgic>, ()> {
+
+    let vcpu_num = vcpu_list.len();
+    let mut vgic = Vgic::new(base_ipa, length, vcpu_num);
+
+    for i in 0..GIC_SPI_MAX {
+        vgic.vgicd.interrupts.push(VgicInt::new(i));
+    }
+
+    for vcpu in vcpu_list {
+        let mut cpu_priv = vint_private::VgicCpuPriv::default();
+        for int_idx in 0..GIC_PRIVINT_NUM {
+            
+            let phys_id = vcpu.phys_id();
+
+            cpu_priv.interrupts.push(VgicInt::priv_new(
+                int_idx,
+                vcpu.clone(),
+                1 << phys_id,
+                int_idx < GIC_SGIS_NUM,
+            ));
+        }
+
+        vgic.cpu_priv.push(cpu_priv);
+    }
+
+    Ok(Arc::new(vgic))
+}
+
+pub fn vgic_set_hw_int(vm: &Vm, int_id: usize) {
+    // soft
+    if int_id < GIC_SGIS_NUM {
+        return;
+    }
+
+    let vgic = vm.vgic();
+
+    // ppi
+    if int_id < GIC_PRIVINT_NUM {
+        for i in 0..vm.cpu_num() {
+            if let Some(interrupt) = vgic.get_int(&vm.vcpu(i).unwrap(), int_id) {
+                let interrupt_lock = interrupt.lock.lock();
+                interrupt.set_hw(true);
+                drop(interrupt_lock);
+            }
+        }
+    // spi
+    } else if let Some(interrupt) = vgic.get_int(&vm.vcpu(0).unwrap(), int_id) {
+        let interrupt_lock = interrupt.lock.lock();
+        interrupt.set_hw(true);
+        drop(interrupt_lock);
+    }
+}
 
 
 
@@ -69,9 +126,14 @@ pub fn vgic_init(gich_base: * mut u8)
     VM0.lock().vcpu_list = vcpu.clone();
     VM0.lock().emu_devs.push(vgic_dev);
 
+    
+    vgic_dev.handler();
+
 
     vgic_set_hw_int(&VM0.lock(), 64);
-    // gic_maintenance_handler();
+
+
+    gic_maintenance_handler();
 }
 
 
