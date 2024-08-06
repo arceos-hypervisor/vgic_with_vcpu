@@ -127,8 +127,8 @@ pub fn vgic_init(gich_base: * mut u8)
     VM0.lock().vcpu_list = vcpu.clone();
     VM0.lock().emu_devs.push(vgic_dev);
 
-    
-    // vgic_dev.handler();
+    let emu_ctx = EmuContext{address:0, width:0, write:true, sign_ext:true, reg:0, reg_width:4};
+    VM0.lock().get_vgic().handler(&emu_ctx, &vcpu[0]);
 
 
     vgic_set_hw_int(&VM0.lock(), 64);

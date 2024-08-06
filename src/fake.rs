@@ -48,7 +48,6 @@ pub fn gic_is_priv(int_id: usize) -> bool {
 
 use alloc::vec::Vec;
 use crate::vgic::Vgic;
-
 use crate::vgic_traits::*;
 
 #[derive(Clone)]
