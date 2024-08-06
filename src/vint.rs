@@ -33,7 +33,7 @@ struct VgicIntInnerConst {
 pub struct VgicIntInnerMut<V: VcpuTrait<Vm>> {
     pub owner: Option<V>,
     pub in_lr: bool,
-    pub lr       : u16,
+    pub lr   : u16,
     enabled  : bool,
     pub state: IrqState,
     prio     : u8,
@@ -43,8 +43,6 @@ pub struct VgicIntInnerMut<V: VcpuTrait<Vm>> {
     pub in_pend: bool,
     pub in_act: bool,
 }
-
-
 
 
 impl<T: VcpuTrait<Vm>> VgicIntInnerMut<T> {
@@ -172,8 +170,6 @@ impl<V: VcpuTrait<Vm> > VgicInt<V> {
         vgic_int.state = state;
     }
 
-    
-
     pub fn clear_owner(&self) {
         let mut vgic_int = self.inner.lock();
         // println!("clear owner get lock");
@@ -233,8 +229,6 @@ impl<V: VcpuTrait<Vm> > VgicInt<V> {
         let vgic_int = self.inner.lock();
         vgic_int.cfg
     }
-
-    
 
     pub fn owner_phys_id(&self) -> Option<usize> {
         let vgic_int = self.inner.lock();

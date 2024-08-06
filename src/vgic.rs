@@ -720,7 +720,6 @@ impl <V: VcpuTrait<Vm> + Clone> Vgic <V> {
         }
     }
 
-
     pub fn set_prio(&self, vcpu: &V, int_id: usize, mut prio: u8) {
         if let Some(interrupt) = self.get_int(vcpu, int_id) {
             prio &= 0xf0; // gic-400 only allows 4 priority bits in non-secure state
@@ -766,7 +765,6 @@ impl <V: VcpuTrait<Vm> + Clone> Vgic <V> {
             drop(interrupt_lock);
         }
     }
-
 
     pub fn set_pend(&self, vcpu: &V, int_id: usize, pend: bool) {
         // TODO: sgi_get_pend ?
@@ -833,8 +831,6 @@ impl <V: VcpuTrait<Vm> + Clone> Vgic <V> {
     }
 
 }
-
-
 
 
 /// Maps CPU ID to CPU interface number for QEMU
@@ -964,32 +960,6 @@ fn gich_get_lr<V: VcpuTrait<Vm>>(interrupt: &VgicInt<V>) -> Option<u32> {
         return Some(lr_val);
     }
     None
-}
-
-
-pub fn vgic_set_hw_int(vm: &Vm, int_id: usize) {
-    // soft
-    if int_id < GIC_SGIS_NUM {
-        return;
-    }
-
-    let vgic = vm.vgic();
-
-    // ppi
-    if int_id < GIC_PRIVINT_NUM {
-        for i in 0..vm.cpu_num() {
-            if let Some(interrupt) = vgic.get_int(&vm.vcpu(i).unwrap(), int_id) {
-                let interrupt_lock = interrupt.lock.lock();
-                interrupt.set_hw(true);
-                drop(interrupt_lock);
-            }
-        }
-    // spi
-    } else if let Some(interrupt) = vgic.get_int(&vm.vcpu(0).unwrap(), int_id) {
-        let interrupt_lock = interrupt.lock.lock();
-        interrupt.set_hw(true);
-        drop(interrupt_lock);
-    }
 }
 
 
