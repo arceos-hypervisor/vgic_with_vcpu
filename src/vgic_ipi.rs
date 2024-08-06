@@ -8,7 +8,7 @@ use crate::fake::*;
 
 use crate::vgic_traits::VcpuTrait;
 use crate::vgic_traits::PcpuTrait;
-
+use crate::vgic_traits::VmTrait;
 
 
 pub fn vgic_ipi_handler(msg: IpiMessage) {

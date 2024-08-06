@@ -61,48 +61,9 @@ pub struct Vm  {
 // unsafe impl Sync for Vm {}
 // unsafe impl Send for Vm {}
 
-
 impl Vm {
     pub fn new(id: usize) -> Self{
         Vm { id: id, vcpu_list: Vec::new(), emu_devs: Vec::new() }
-    }
-    
-    pub fn id(&self) -> usize {
-        self.id
-    }
-    #[inline] pub fn vcpu_list(&self) -> &[Vcpu] { &self.vcpu_list }
-    pub fn vcpu(&self, id :usize) -> Option<&Vcpu> {
-        match self.vcpu_list().get(id) {
-            Some(vcpu) => {
-                assert_eq!(id, vcpu.id());
-                Some(vcpu)
-            }
-            None => {
-                log::error!(
-                    "vcpu idx {} is to large than vcpu_list len {}",
-                    id,
-                    self.vcpu_list().len()
-                );
-                None
-            }
-        }
-    }
-    
-    //pub fn cpu_num(&self) -> usize { self.vcpu_list.len() }
-    pub fn has_interrupt(&self, _id: usize) -> bool {true}
-    pub fn emu_has_interrupt(&self, _id: usize) -> bool {true}
-    /*
-    pub fn emu_has_interrupt(&self, int_id: usize) -> bool {
-        for emu_dev in self.config().emulated_device_list() {
-            if int_id == emu_dev.irq_id {
-                return true;
-            }
-        }
-        false
-    }
-    */
-    pub fn get_vgic(&self) -> &Vgic<Vcpu> { 
-        &self.emu_devs[0]
     }
 
     /* 下面四个函数 targetr 和 sgi 要用 */
@@ -141,6 +102,35 @@ impl Vm {
         }
         pmask
     }
+
+}
+
+/* 实现trait */
+impl VmTrait for Vm {
+
+    fn id(&self) -> usize { self.id }
+    fn vcpu_list(&self) -> &[Vcpu] { &self.vcpu_list }
+    fn vcpu(&self, id :usize) -> Option<&Vcpu> {
+        match self.vcpu_list().get(id) {
+            Some(vcpu) => {
+                assert_eq!(id, vcpu.id());
+                Some(vcpu)
+            }
+            None => {
+                log::error!(
+                    "vcpu idx {} is to large than vcpu_list len {}",
+                    id,
+                    self.vcpu_list().len()
+                );
+                None
+            }
+        }
+    }
+    
+    //pub fn cpu_num(&self) -> usize { self.vcpu_list.len() }
+    fn has_interrupt(&self, _id: usize) -> bool {true}
+    fn emu_has_interrupt(&self, _id: usize) -> bool {true}
+    fn get_vgic(&self) -> &Vgic<Vcpu> {  &self.emu_devs[0] }
 
 }
 

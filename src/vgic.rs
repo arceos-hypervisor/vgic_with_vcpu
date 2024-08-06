@@ -59,7 +59,7 @@ use arm_gic::gic_v2::GicDistributor;
 
 use crate::vgic_traits::PcpuTrait;
 use crate::vgic_traits::VcpuTrait;
-
+use crate::vgic_traits::VmTrait;
 
 pub struct Vgicd<V> 
     where V: VcpuTrait<Vm>
@@ -496,7 +496,8 @@ impl <V: VcpuTrait<Vm> + Clone> Vgic <V> {
     }
 
     fn route(&self, vcpu: &V, interrupt: &VgicInt<V>) {
-        let cpu_id = current_cpu().id();
+        /* current_cpu().id()  => vcpu->phy_id */
+        let cpu_id = vcpu.phys_id();
         if let IrqState::IrqSInactive = interrupt.state() {
             return;
         }
@@ -821,7 +822,7 @@ impl <V: VcpuTrait<Vm> + Clone> Vgic <V> {
                     None => {
                         panic!(
                             "set_pend: Core {} int {} has no owner",
-                            current_cpu().id(),
+                            vcpu.phys_id(),
                             interrupt.id()
                         );
                     }

@@ -14,7 +14,7 @@ use crate::fake::*;
 
 
 use crate::vgic_traits::VcpuTrait;
-
+use crate::vgic_traits::VmTrait;
 
 // for maintenance
 impl  <V: VcpuTrait<Vm> + Clone> Vgic<V> {

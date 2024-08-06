@@ -14,7 +14,7 @@ use crate::fake::*;
 
 
 
-use crate::vgic_traits::PcpuTrait;
+use crate::vgic_traits::VmTrait;
 use crate::vgic_traits::VcpuTrait;
 
 
@@ -404,10 +404,12 @@ impl  <V: VcpuTrait<Vm> + Clone> Vgic<V> {
                         trgtlist = vgic_target_translate(&vm, bit_extract(val, 16, 8) as u32, true) as usize;
                     }
                     1 => {
-                        trgtlist = active_vm_ncpu() & !(1 << current_cpu().id());
+                        /* current_cpu().id()  => vcpu->phy_id */
+                        trgtlist = active_vm_ncpu() & !(1 << vcpu.phys_id());
                     }
                     2 => {
-                        trgtlist = 1 << current_cpu().id();
+                        /* current_cpu().id()  => vcpu->phy_id */
+                        trgtlist = 1 << vcpu.phys_id();
                     }
                     3 => {
                         return;

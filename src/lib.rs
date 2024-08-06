@@ -36,6 +36,7 @@ use crate::consts::*;
 use alloc::sync::Arc;
 
 use crate::vgic_traits::VcpuTrait;
+use crate::vgic_traits::VmTrait;
 
 use lazy_static::lazy_static;
 use axsync::Mutex;
