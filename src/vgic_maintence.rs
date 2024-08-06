@@ -166,7 +166,7 @@ pub fn gic_maintenance_handler() {
             panic!("gic_maintenance_handler: current vcpu.vm is None");
         }
     };
-    let vgic = vm.vgic();
+    let vgic = vm.get_vgic();
 
     if misr & 1 != 0 {
         vgic.handle_trapped_eoir(current_cpu().active_vcpu.as_ref().unwrap());

@@ -82,11 +82,11 @@ pub fn vgic_set_hw_int(vm: &Vm, int_id: usize) {
         return;
     }
 
-    let vgic = vm.vgic();
+    let vgic = vm.get_vgic();
 
     // ppi
     if int_id < GIC_PRIVINT_NUM {
-        for i in 0..vm.cpu_num() {
+        for i in 0..vm.vcpu_list().len() {
             if let Some(interrupt) = vgic.get_int(&vm.vcpu(i).unwrap(), int_id) {
                 let interrupt_lock = interrupt.lock.lock();
                 interrupt.set_hw(true);

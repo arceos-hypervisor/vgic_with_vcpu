@@ -1,7 +1,6 @@
 
 use crate::vgic::Vgic;
 use crate::vgic::vgic_get_state;
-use crate::vgic::vgic_target_translate;
 use crate::consts::*;
 use crate::GicHypervisorInterface;
 use arm_gic::gic_v2::GicDistributor;
@@ -597,4 +596,28 @@ impl <V: VcpuTrait<Vm> + Clone> Vgic<V> {
         }
         true
     }
+}
+
+
+pub fn vgic_target_translate(vm: &Vm, trgt: u32, v2p: bool) -> u32 {
+    let from = trgt.to_le_bytes();
+
+    let mut result = 0;
+    for (idx, val) in from
+        .map(|x| {
+            if v2p {
+                vm.vcpu_to_pcpu_mask(x as usize, 8) as u32
+            } else {
+                vm.pcpu_to_vcpu_mask(x as usize, 8) as u32
+            }
+        })
+        .iter()
+        .enumerate()
+    {
+        result |= *val << (8 * idx);
+        if idx >= 4 {
+            panic!("illegal idx, from len {}", from.len());
+        }
+    }
+    result
 }

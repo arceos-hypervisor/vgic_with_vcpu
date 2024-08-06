@@ -58,14 +58,15 @@ pub struct Vm  {
     pub emu_devs: Vec<Arc<Vgic<Vcpu>>>,
 }
 
-unsafe impl Sync for Vm {}
-unsafe impl Send for Vm {}
+// unsafe impl Sync for Vm {}
+// unsafe impl Send for Vm {}
 
 
 impl Vm {
     pub fn new(id: usize) -> Self{
         Vm { id: id, vcpu_list: Vec::new(), emu_devs: Vec::new() }
     }
+    
     pub fn id(&self) -> usize {
         self.id
     }
@@ -86,7 +87,8 @@ impl Vm {
             }
         }
     }
-    pub fn cpu_num(&self) -> usize { self.vcpu_list.len() }
+    
+    //pub fn cpu_num(&self) -> usize { self.vcpu_list.len() }
     pub fn has_interrupt(&self, _id: usize) -> bool {true}
     pub fn emu_has_interrupt(&self, _id: usize) -> bool {true}
     /*
@@ -99,10 +101,11 @@ impl Vm {
         false
     }
     */
-    pub fn vgic(&self) -> Vgic<Vcpu> { 
-        Vgic::new(1, 1, 1)
+    pub fn get_vgic(&self) -> &Vgic<Vcpu> { 
+        &self.emu_devs[0]
     }
 
+    /* 下面四个函数 targetr 和 sgi 要用 */
 
     pub fn vcpuid_to_pcpuid(&self, vcpuid: usize) -> Result<usize, ()> {
         self.vcpu_list.get(vcpuid).map(|vcpu| vcpu.phys_id()).ok_or(())
@@ -138,6 +141,7 @@ impl Vm {
         }
         pmask
     }
+
 }
 
 /* ============================================================================ */

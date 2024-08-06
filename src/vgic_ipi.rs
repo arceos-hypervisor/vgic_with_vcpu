@@ -32,7 +32,7 @@ pub fn vgic_ipi_handler(msg: IpiMessage) {
             }
             Some(x) => x,
         };
-        let vgic = vm.vgic();
+        let vgic = vm.get_vgic();
 
         if vm_id != vm.id() {
             // error!("VM {} received vgic msg from another vm {}", vm.id(), vm_id);
