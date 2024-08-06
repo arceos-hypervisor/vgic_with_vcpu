@@ -52,10 +52,10 @@ use crate::vgic::Vgic;
 use crate::vgic_traits::*;
 
 #[derive(Clone)]
-pub struct Vm {
+pub struct Vm  {
     pub id: usize,
     pub vcpu_list: Vec<Vcpu>,
-    pub emu_devs: Vec<Arc<Vgic>>,
+    pub emu_devs: Vec<Arc<Vgic<Vcpu>>>,
 }
 
 unsafe impl Sync for Vm {}
@@ -69,8 +69,7 @@ impl Vm {
     pub fn id(&self) -> usize {
         self.id
     }
-    #[inline]
-    pub fn vcpu_list(&self) -> &[Vcpu] { &self.vcpu_list }
+    #[inline] pub fn vcpu_list(&self) -> &[Vcpu] { &self.vcpu_list }
     pub fn vcpu(&self, id :usize) -> Option<&Vcpu> {
         match self.vcpu_list().get(id) {
             Some(vcpu) => {
@@ -100,7 +99,7 @@ impl Vm {
         false
     }
     */
-    pub fn vgic(&self) -> Vgic { 
+    pub fn vgic(&self) -> Vgic<Vcpu> { 
         Vgic::new(1, 1, 1)
     }
 
@@ -157,7 +156,7 @@ impl Vm {
     pub vm      : Weak<Vm>,
 }
 
-
+/* 实现trait */
 impl VcpuTrait<Vm> for  Vcpu {
     fn vm(&self) -> Option<Arc<Vm>> { self.vm.upgrade() }
     
@@ -174,7 +173,7 @@ impl VcpuTrait<Vm> for  Vcpu {
 /* ========= Current cpu (pcpu) ============ */
 /* ============================================================================ */
 /* ============================================================================ */
-
+#[derive(Clone)]
 pub struct VcpuArray {
     array: [Option<Vcpu>; 64],
     len: usize,
@@ -197,7 +196,7 @@ impl VcpuArray {
     }
 }
 
-
+#[derive(Clone)]
 pub struct Pcpu  {
     /* ipi */
     /* maintence */

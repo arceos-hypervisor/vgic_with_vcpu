@@ -54,10 +54,10 @@ pub fn vgicd_emu_access_is_vaild(emu_ctx: &EmuContext) -> bool {
     true
 }
 
-impl Vgic {
+impl  <V: VcpuTrait<Vm> + Clone> Vgic<V> {
     /* set gpr get gpr */
     /* 找到当前活跃 vm ，向其vcpu发送ipi，保证ctrlr同步 */
-    fn emu_ctrl_access<T: VcpuTrait<Vm>> (&self, emu_ctx: &EmuContext, vcpu: &T) {
+    fn emu_ctrl_access (&self, emu_ctx: &EmuContext, vcpu: &V) {
         if emu_ctx.write {
             let prev_ctlr = self.vgicd_ctlr();
             let idx = emu_ctx.reg;
@@ -90,7 +90,7 @@ impl Vgic {
     }
 
     /* set gpr get gpr */
-    fn emu_typer_access<T: VcpuTrait<Vm>> (&self, emu_ctx: &EmuContext, vcpu: &T) {
+    fn emu_typer_access (&self, emu_ctx: &EmuContext, vcpu: &V) {
         if !emu_ctx.write {
             let idx = emu_ctx.reg;
             let val = self.vgicd_typer() as usize;
@@ -101,7 +101,7 @@ impl Vgic {
     }
 
     /* set gpr get gpr */
-    fn emu_iidr_access<T: VcpuTrait<Vm>> (&self, emu_ctx: &EmuContext, vcpu: &T) {
+    fn emu_iidr_access (&self, emu_ctx: &EmuContext, vcpu: &V) {
         if !emu_ctx.write {
             let idx = emu_ctx.reg;
             let val = self.vgicd_iidr() as usize;
@@ -113,7 +113,7 @@ impl Vgic {
 
     /* set gpr get gpr */
     /*  */
-    fn emu_isenabler_access<T: VcpuTrait<Vm>> (&self, emu_ctx: &EmuContext, vcpu: &T) {
+    fn emu_isenabler_access(&self, emu_ctx: &EmuContext, vcpu: &V) {
         // println!("DEBUG: in emu_isenabler_access");
         let reg_idx = (emu_ctx.address & 0b1111111) / 4;
         let idx = emu_ctx.reg;
@@ -145,12 +145,12 @@ impl Vgic {
         if emu_ctx.write {
             for i in 0..32 {
                 if bit_get(val, i) != 0 {
-                    self.set_enable(current_cpu().active_vcpu.as_ref().unwrap(), first_int + i, true);
+                    self.set_enable(vcpu, first_int + i, true);
                 }
             }
         } else {
             for i in 0..32 {
-                if self.get_enable(current_cpu().active_vcpu.as_ref().unwrap(), first_int + i) {
+                if self.get_enable(vcpu, first_int + i) {
                     val |= 1 << i;
                 }
             }
@@ -161,7 +161,7 @@ impl Vgic {
 
     /* set gpr get gpr */
     /*  */
-    fn emu_pendr_access<T: VcpuTrait<Vm>> (&self, emu_ctx: &EmuContext, set: bool, vcpu: &T) {
+    fn emu_pendr_access (&self, emu_ctx: &EmuContext, set: bool, vcpu: &V) {
         // trace!("emu_pendr_access");
         let reg_idx = (emu_ctx.address & 0b1111111) / 4;
         let idx = emu_ctx.reg;
@@ -191,12 +191,12 @@ impl Vgic {
         if emu_ctx.write {
             for i in 0..32 {
                 if bit_get(val, i) != 0 {
-                    self.set_pend(current_cpu().active_vcpu.as_ref().unwrap(), first_int + i, set);
+                    self.set_pend(vcpu, first_int + i, set);
                 }
             }
         } else {
             for i in 0..32 {
-                match self.get_int(current_cpu().active_vcpu.as_ref().unwrap(), first_int + i) {
+                match self.get_int(vcpu, first_int + i) {
                     Some(interrupt) => {
                         if vgic_get_state(interrupt) & 1 != 0 {
                             val |= 1 << i;
@@ -213,11 +213,11 @@ impl Vgic {
     }
 
     /* nothing */
-    fn emu_ispendr_access<T: VcpuTrait<Vm>> (&self, emu_ctx: &EmuContext, vcpu: &T) {
+    fn emu_ispendr_access(&self, emu_ctx: &EmuContext, vcpu: &V) {
         self.emu_pendr_access(emu_ctx, true, vcpu);
     }
 
-    fn emu_activer_access<T: VcpuTrait<Vm>> (&self, emu_ctx: &EmuContext, set: bool, vcpu: &T) {
+    fn emu_activer_access (&self, emu_ctx: &EmuContext, set: bool, vcpu: &V) {
         // println!("DEBUG: in emu_activer_access");
         let reg_idx = (emu_ctx.address & 0b1111111) / 4;
         let idx = emu_ctx.reg;
@@ -249,12 +249,12 @@ impl Vgic {
         if emu_ctx.write {
             for i in 0..32 {
                 if bit_get(val, i) != 0 {
-                    self.set_active(current_cpu().active_vcpu.as_ref().unwrap(), first_int + i, set);
+                    self.set_active(vcpu, first_int + i, set);
                 }
             }
         } else {
             for i in 0..32 {
-                match self.get_int(current_cpu().active_vcpu.as_ref().unwrap(), first_int + i) {
+                match self.get_int(vcpu, first_int + i) {
                     Some(interrupt) => {
                         if vgic_get_state(interrupt) & 2 != 0 {
                             val |= 1 << i;
@@ -271,11 +271,11 @@ impl Vgic {
     }
 
     /* nothing */
-    fn emu_isactiver_access<T: VcpuTrait<Vm>> (&self, emu_ctx: &EmuContext, vcpu: &T) {
+    fn emu_isactiver_access(&self, emu_ctx: &EmuContext, vcpu: &V) {
         self.emu_activer_access(emu_ctx, true, vcpu);
     }
 
-    fn emu_icenabler_access<T: VcpuTrait<Vm>> (&self, emu_ctx: &EmuContext, vcpu: &T) {
+    fn emu_icenabler_access (&self, emu_ctx: &EmuContext, vcpu: &V) {
         let reg_idx = (emu_ctx.address & 0b1111111) / 4;
         let idx = emu_ctx.reg;
         let mut val = if emu_ctx.write { vcpu.get_gpr(idx) } else { 0 };
@@ -308,12 +308,12 @@ impl Vgic {
         if emu_ctx.write {
             for i in 0..32 {
                 if bit_get(val, i) != 0 {
-                    self.set_enable(current_cpu().active_vcpu.as_ref().unwrap(), first_int + i, false);
+                    self.set_enable(vcpu, first_int + i, false);
                 }
             }
         } else {
             for i in 0..32 {
-                if self.get_enable(current_cpu().active_vcpu.as_ref().unwrap(), first_int + i) {
+                if self.get_enable(vcpu, first_int + i) {
                     val |= 1 << i;
                 }
             }
@@ -323,16 +323,16 @@ impl Vgic {
     }
 
     /* nothing */
-    fn emu_icpendr_access<T: VcpuTrait<Vm>> (&self, emu_ctx: &EmuContext, vcpu: &T) {
+    fn emu_icpendr_access (&self, emu_ctx: &EmuContext, vcpu: &V) {
         self.emu_pendr_access(emu_ctx, false, vcpu);
     }
 
     /* nothing */
-    fn emu_icativer_access<T: VcpuTrait<Vm>> (&self, emu_ctx: &EmuContext, vcpu: &T) {
+    fn emu_icativer_access (&self, emu_ctx: &EmuContext, vcpu: &V) {
         self.emu_activer_access(emu_ctx, false, vcpu);
     }
 
-    fn emu_icfgr_access<T: VcpuTrait<Vm>> (&self, emu_ctx: &EmuContext, vcpu: &T) {
+    fn emu_icfgr_access (&self, emu_ctx: &EmuContext, vcpu: &V) {
         let first_int = (32 / GIC_CONFIG_BITS) * bit_extract(emu_ctx.address, 0, 9) / 4;
         let vm_id = active_vm_id();
         let vm = match active_vm() {
@@ -363,7 +363,7 @@ impl Vgic {
             let mut bit = 0;
             while bit < emu_ctx.width * 8 {
                 self.set_icfgr(
-                    current_cpu().active_vcpu.as_ref().unwrap(),
+                    vcpu,
                     irq,
                     bit_extract(cfg as usize, bit, 2) as u8,
                 );
@@ -375,7 +375,7 @@ impl Vgic {
             let mut irq = first_int;
             let mut bit = 0;
             while bit < emu_ctx.width * 8 {
-                cfg |= (self.get_icfgr(current_cpu().active_vcpu.as_ref().unwrap(), irq) as usize) << bit;
+                cfg |= (self.get_icfgr(vcpu, irq) as usize) << bit;
                 bit += 2;
                 irq += 1;
             }
@@ -385,7 +385,7 @@ impl Vgic {
         }
     }
 
-    fn emu_sgiregs_access<T: VcpuTrait<Vm>> (&self, emu_ctx: &EmuContext, vcpu: &T) {
+    fn emu_sgiregs_access (&self, emu_ctx: &EmuContext, vcpu: &V) {
         let idx = emu_ctx.reg;
         let val = if emu_ctx.write { vcpu.get_gpr(idx) } else { 0 };
         let vm = match active_vm() {
@@ -442,7 +442,7 @@ impl Vgic {
         }
     }
 
-    fn emu_ipriorityr_access<T: VcpuTrait<Vm>>(&self, emu_ctx: &EmuContext, vcpu: &T) {
+    fn emu_ipriorityr_access(&self, emu_ctx: &EmuContext, vcpu: &V) {
         let idx = emu_ctx.reg;
         let mut val = if emu_ctx.write { vcpu.get_gpr(idx) } else { 0 };
         let first_int = (8 / GIC_PRIO_BITS) * bit_extract(emu_ctx.address, 0, 9);
@@ -474,14 +474,14 @@ impl Vgic {
         if emu_ctx.write {
             for i in 0..emu_ctx.width {
                 self.set_prio(
-                    current_cpu().active_vcpu.as_ref().unwrap(),
+                    vcpu,
                     first_int + i,
                     bit_extract(val, GIC_PRIO_BITS * i, GIC_PRIO_BITS) as u8,
                 );
             }
         } else {
             for i in 0..emu_ctx.width {
-                val |= (self.get_prio(current_cpu().active_vcpu.as_ref().unwrap(), first_int + i) as usize)
+                val |= (self.get_prio(vcpu, first_int + i) as usize)
                     << (GIC_PRIO_BITS * i);
             }
             let idx = emu_ctx.reg;
@@ -489,7 +489,7 @@ impl Vgic {
         }
     }
 
-    fn emu_itargetr_access<T: VcpuTrait<Vm>>(&self, emu_ctx: &EmuContext, vcpu: &T) {
+    fn emu_itargetr_access(&self, emu_ctx: &EmuContext, vcpu: &V) {
         let idx = emu_ctx.reg;
         let mut val = if emu_ctx.write { vcpu.get_gpr(idx) } else { 0 };
         let first_int = (8 / GIC_TARGET_BITS) * bit_extract(emu_ctx.address, 0, 9);
@@ -498,14 +498,14 @@ impl Vgic {
             val = vgic_target_translate(&active_vm().unwrap(), val as u32, true) as usize;
             for i in 0..emu_ctx.width {
                 self.set_trgt(
-                    current_cpu().active_vcpu.as_ref().unwrap(),
+                    vcpu,
                     first_int + i,
                     bit_extract(val, GIC_TARGET_BITS * i, GIC_TARGET_BITS) as u8,
                 );
             }
         } else {
             for i in 0..emu_ctx.width {
-                val |= (self.get_trgt(current_cpu().active_vcpu.as_ref().unwrap(), first_int + i) as usize)
+                val |= (self.get_trgt(vcpu, first_int + i) as usize)
                     << (GIC_TARGET_BITS * i);
             }
             val = vgic_target_translate(&active_vm().unwrap(), val as u32, false) as usize;
@@ -518,7 +518,7 @@ impl Vgic {
 }
 
 
-impl Vgic {
+impl <V: VcpuTrait<Vm> + Clone> Vgic<V> {
 
     fn emu_type(&self) -> EmuDeviceType {
         EmuDeviceType::EmuDeviceTGicd
@@ -528,7 +528,7 @@ impl Vgic {
         self.address_range.clone()
     }
 
-    pub fn handler<T: VcpuTrait<Vm>>(&self, emu_ctx: &EmuContext, ctx: &T) -> bool {
+    pub fn handler(&self, emu_ctx: &EmuContext, ctx: &V) -> bool {
         let offset = emu_ctx.address & 0xfff;
 
         let vgicd_offset_prefix = offset >> 7;

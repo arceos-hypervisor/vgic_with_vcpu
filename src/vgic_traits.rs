@@ -1,4 +1,4 @@
-
+use crate::fake::Vm;
 use alloc::sync::Arc;
 
 /* 定义trait */

@@ -17,10 +17,10 @@ use crate::vgic_traits::VcpuTrait;
 
 
 // for maintenance
-impl Vgic {
+impl  <V: VcpuTrait<Vm> + Clone> Vgic<V> {
     // vcpu_id
     // 得到vcpu的cpu_priv的 pend_list.front act_list.front
-    pub fn int_list_head(&self, vcpu_id: usize, is_pend: bool) -> Option<&VgicInt> {
+    pub fn int_list_head(&self, vcpu_id: usize, is_pend: bool) -> Option<&VgicInt<V>> {
         // let vcpu_id = vcpu.id();
         let cpu_priv = self.cpu_priv[vcpu_id].inner_mut.borrow();
         if is_pend {
@@ -33,7 +33,7 @@ impl Vgic {
     }
     
     // maintenance use
-    fn handle_trapped_eoir(&self, vcpu: &Vcpu) {
+    fn handle_trapped_eoir(&self, vcpu: &V) {
         let gic_lrs = gic_lrs();
         let mut lr_idx_opt = bitmap_find_nth(
             GicHypervisorInterface::eisr(0) as usize | ((GicHypervisorInterface::eisr(1) as usize) << 32),
@@ -74,7 +74,7 @@ impl Vgic {
     }
 
     // maintenance use
-    fn refill_lrs(&self, vcpu: &Vcpu) {
+    fn refill_lrs(&self, vcpu: &V) {
         let gic_lrs = gic_lrs();
         let mut has_pending = false;
 
@@ -94,7 +94,7 @@ impl Vgic {
         );
 
         while lr_idx_opt.is_some() {
-            let mut interrupt_opt: Option<&VgicInt> = None;
+            let mut interrupt_opt: Option<&VgicInt<V>> = None;
             let mut prev_pend = false;
             let act_head = self.int_list_head(vcpu.id(), false);
             let pend_head = self.int_list_head(vcpu.id(), true);
@@ -140,7 +140,7 @@ impl Vgic {
     }
 
     // maintenance use
-    fn eoir_highest_spilled_active(&self, vcpu: &Vcpu) {
+    fn eoir_highest_spilled_active(&self, vcpu: &V) {
             if let Some(int) = self.int_list_head(vcpu.id(), false) {
                 int.lock.lock();
                 vgic_int_get_owner(vcpu, int);

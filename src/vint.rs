@@ -14,21 +14,92 @@ use crate::fake::*;
 use crate::vgic_traits::PcpuTrait;
 use crate::vgic_traits::VcpuTrait;
 
-pub struct VgicInt {
+pub struct VgicInt<V>
+where V: VcpuTrait<Vm> 
+{
     inner_const: VgicIntInnerConst,
-    inner: Mutex<VgicIntInnerMut>,
+    inner: Mutex<VgicIntInnerMut<V>>,
     pub lock: Mutex<()>,
-}
-
-struct VgicIntInnerConst {
-    id: u16,
-    hw: Cell<bool>,
 }
 
 // SAFETY: VgicIntInnerConst hw is only set when initializing
 unsafe impl Sync for VgicIntInnerConst {}
 
-impl VgicInt {
+
+struct VgicIntInnerConst {
+    id: u16,
+    hw: Cell<bool>,
+}
+pub struct VgicIntInnerMut<V: VcpuTrait<Vm>> {
+    pub owner: Option<V>,
+    pub in_lr: bool,
+    pub lr       : u16,
+    enabled  : bool,
+    pub state: IrqState,
+    prio     : u8,
+    targets  : u8,
+    cfg      : u8,
+
+    pub in_pend: bool,
+    pub in_act: bool,
+}
+
+
+
+
+impl<T: VcpuTrait<Vm>> VgicIntInnerMut<T> {
+    fn new() -> Self {
+        Self {
+            owner: None,
+            in_lr: false,
+            lr: 0,
+            enabled: false,
+            state: IrqState::IrqSInactive,
+            prio: 0xff,
+            targets: 0,
+            cfg: 0,
+            in_pend: false,
+            in_act: false,
+        }
+    }
+
+    fn priv_new(owner: T, targets: usize, enabled: bool) -> Self {
+        Self {
+            owner: Some(owner),
+            in_lr: false,
+            lr: 0,
+            enabled,
+            state: IrqState::IrqSInactive,
+            prio: 0xff,
+            targets: targets as u8,
+            cfg: 0,
+            in_pend: false,
+            in_act: false,
+        }
+    }
+
+    fn owner_vm(&self) -> Arc<Vm> {
+        let owner = self.owner.as_ref().unwrap();
+        owner.vm().unwrap()
+    }
+}
+
+impl<V: VcpuTrait<Vm> + Clone > VgicInt<V> {
+
+    pub fn set_owner(&self, owner: V) {
+        let mut vgic_int = self.inner.lock();
+        vgic_int.owner = Some(owner);
+    }
+
+    pub fn owner(&self) -> Option<V> {
+        let vgic_int = self.inner.lock();
+        vgic_int.owner.as_ref().cloned()
+    }
+    
+}
+
+impl<V: VcpuTrait<Vm> > VgicInt<V> {
+
     pub fn new(id: usize) -> Self {
         Self {
             inner_const: VgicIntInnerConst {
@@ -40,7 +111,7 @@ impl VgicInt {
         }
     }
 
-    pub fn priv_new(id: usize, owner: Vcpu, targets: usize, enabled: bool) -> Self {
+    pub fn priv_new(id: usize, owner: V, targets: usize, enabled: bool) -> Self {
         Self {
             inner_const: VgicIntInnerConst {
                 id: id as u16,
@@ -101,10 +172,7 @@ impl VgicInt {
         vgic_int.state = state;
     }
 
-    pub fn set_owner(&self, owner: Vcpu) {
-        let mut vgic_int = self.inner.lock();
-        vgic_int.owner = Some(owner);
-    }
+    
 
     pub fn clear_owner(&self) {
         let mut vgic_int = self.inner.lock();
@@ -166,10 +234,7 @@ impl VgicInt {
         vgic_int.cfg
     }
 
-    pub fn owner(&self) -> Option<Vcpu> {
-        let vgic_int = self.inner.lock();
-        vgic_int.owner.as_ref().cloned()
-    }
+    
 
     pub fn owner_phys_id(&self) -> Option<usize> {
         let vgic_int = self.inner.lock();
@@ -199,77 +264,9 @@ impl VgicInt {
 
     pub fn locked_helper<F>(&self, f: F)
     where
-        F: FnOnce(&mut VgicIntInnerMut),
+        F: FnOnce(&mut VgicIntInnerMut<V>),
     {
         f(&mut self.inner.lock());
     }
-
-    pub fn vgic_owns(&self, vcpu: &Vcpu) -> bool {
-        // sgi ppi 
-        if gic_is_priv(self.id() as usize) {
-            return true;
-        }
-    
-        let vcpu_id = vcpu.id();
-        let pcpu_id = vcpu.phys_id();
-        match self.owner() {
-            Some(owner) => {
-                let owner_vcpu_id = owner.id();
-                let owner_pcpu_id = owner.phys_id();
-                owner_vcpu_id == vcpu_id && owner_pcpu_id == pcpu_id
-            }
-            None => false,
-        }
-    }
 }
 
-pub struct VgicIntInnerMut {
-    pub owner: Option<Vcpu>,
-    pub in_lr: bool,
-    pub lr       : u16,
-    enabled  : bool,
-    pub state: IrqState,
-    prio     : u8,
-    targets  : u8,
-    cfg      : u8,
-
-    pub in_pend: bool,
-    pub in_act: bool,
-}
-
-impl VgicIntInnerMut {
-    fn new() -> Self {
-        Self {
-            owner: None,
-            in_lr: false,
-            lr: 0,
-            enabled: false,
-            state: IrqState::IrqSInactive,
-            prio: 0xff,
-            targets: 0,
-            cfg: 0,
-            in_pend: false,
-            in_act: false,
-        }
-    }
-
-    fn priv_new(owner: Vcpu, targets: usize, enabled: bool) -> Self {
-        Self {
-            owner: Some(owner),
-            in_lr: false,
-            lr: 0,
-            enabled,
-            state: IrqState::IrqSInactive,
-            prio: 0xff,
-            targets: targets as u8,
-            cfg: 0,
-            in_pend: false,
-            in_act: false,
-        }
-    }
-
-    fn owner_vm(&self) -> Arc<Vm> {
-        let owner = self.owner.as_ref().unwrap();
-        owner.vm().unwrap()
-    }
-}

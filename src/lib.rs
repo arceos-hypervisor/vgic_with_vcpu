@@ -29,7 +29,7 @@ use vgic::Vgic;
 use crate::config::VgicGlobal;
 use arm_gic::gic_v2::GicDistributor;
 use crate::vgic_maintence::gic_maintenance_handler;
-use crate::vgic::vgic_set_hw_int;
+// use crate::vgic::vgic_set_hw_int;
 // use crate::vgic::emu_intc_init;
 use crate::vint::*;
 use crate::consts::*;
@@ -47,7 +47,7 @@ use alloc::sync::Weak;
 
 
 // init intc for a vm
-pub fn emu_intc_init(base_ipa: usize, length: usize, vcpu_list: &[Vcpu]) -> Result<Arc<Vgic>, ()> {
+pub fn emu_intc_init(base_ipa: usize, length: usize, vcpu_list: &[Vcpu]) -> Result<Arc<Vgic<Vcpu>>, ()> {
 
     let vcpu_num = vcpu_list.len();
     let mut vgic = Vgic::new(base_ipa, length, vcpu_num);
@@ -127,7 +127,7 @@ pub fn vgic_init(gich_base: * mut u8)
     VM0.lock().emu_devs.push(vgic_dev);
 
     
-    vgic_dev.handler();
+    // vgic_dev.handler();
 
 
     vgic_set_hw_int(&VM0.lock(), 64);
