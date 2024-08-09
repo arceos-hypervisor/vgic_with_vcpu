@@ -19,7 +19,7 @@ pub struct Sgis {
 use crate::VcpuTrait;
 
 pub struct VgicCpuPriv<V>
-where
+    where
     V: VcpuTrait<Vm>,
 {
     pub interrupts: Vec<VgicInt<V>>,

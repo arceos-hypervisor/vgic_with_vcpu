@@ -1,6 +1,6 @@
 
 use crate::vgic::Vgic;
-use crate::vgic::vgic_get_state;
+use crate::vint::vgic_get_state;
 use crate::consts::*;
 use crate::GicHypervisorInterface;
 use arm_gic::gic_v2::GicDistributor;

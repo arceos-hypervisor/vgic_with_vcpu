@@ -1,8 +1,8 @@
 
 use crate::vgic::Vgic;
 use crate::vgic::gic_lrs;
-use crate::vgic::vgic_int_yield_owner;
-use crate::vgic::vgic_int_get_owner;
+use crate::vint::vgic_int_yield_owner;
+use crate::vint::vgic_int_get_owner;
 use crate::vgic::vgic_int_is_hw;
 use crate::vint::*;
 use crate::consts::*;

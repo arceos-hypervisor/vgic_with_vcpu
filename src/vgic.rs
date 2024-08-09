@@ -59,7 +59,6 @@ use arm_gic::gic_v2::GicDistributor;
 
 use crate::vgic_traits::PcpuTrait;
 use crate::vgic_traits::VcpuTrait;
-use crate::vgic_traits::VmTrait;
 
 pub struct Vgicd<V> 
     where V: VcpuTrait<Vm>
@@ -157,7 +156,7 @@ impl <V: VcpuTrait<Vm>> Vgic <V> {
         cpu_priv.curr_lrs[idx]
     }
 
-    fn cpu_priv_sgis_pend(&self, cpu_id: usize, idx: usize) -> u8 {
+    pub fn cpu_priv_sgis_pend(&self, cpu_id: usize, idx: usize) -> u8 {
         let cpu_priv = self.cpu_priv[cpu_id].inner_mut.borrow();
         cpu_priv.sgis[idx].pend
     }
@@ -285,7 +284,7 @@ impl <V: VcpuTrait<Vm> + Clone> Vgic <V> {
     }
 
     fn remove_lr(&self, vcpu: &V, interrupt: &VgicInt<V>) -> bool {
-        if !vgic_owns(vcpu, interrupt) { // 查看中断是否属于该 vcpu 
+        if !vgic_int_owns(vcpu, interrupt) { // 查看中断是否属于该 vcpu 
             return false;
         }
         let int_lr = interrupt.lr();
@@ -429,7 +428,7 @@ impl <V: VcpuTrait<Vm> + Clone> Vgic <V> {
         if prev_int_id != int_id {
             if let Some(prev_interrupt) = self.get_int(vcpu, prev_int_id) {
                 let prev_interrupt_lock = prev_interrupt.lock.lock();
-                if vgic_owns(vcpu, prev_interrupt) && prev_interrupt.in_lr() && prev_interrupt.lr() == lr_ind as u16 {
+                if vgic_int_owns(vcpu, prev_interrupt) && prev_interrupt.in_lr() && prev_interrupt.lr() == lr_ind as u16 {
                     prev_interrupt.set_in_lr(false);
                     let prev_id = prev_interrupt.id() as usize;
                     if !gic_is_priv(prev_id) {
@@ -840,105 +839,8 @@ fn cpuid_to_cpuif(cpuid: usize) -> usize {
     cpuid
 }
 
-
-// vcpu_id, pcpu_id
-// 只考虑 spi 
-// 中断的所有者是当前 vcpu 返回真
-fn vgic_owns<V: VcpuTrait<Vm> + Clone>(vcpu: &V, interrupt: &VgicInt<V>) -> bool {
-    // sgi ppi 
-    if gic_is_priv(interrupt.id() as usize) {
-        return true;
-    }
-
-    let vcpu_id = vcpu.id();
-    let pcpu_id = vcpu.phys_id();
-    match interrupt.owner() {
-        Some(owner) => { 
-            let owner_vcpu_id = owner.id();
-            let owner_pcpu_id = owner.phys_id();
-            owner_vcpu_id == vcpu_id && owner_pcpu_id == pcpu_id
-        }
-        None => false,
-    }
-}
-
-
-/// 1、这个int没有owner的话，设置当前vcpu为他的主人  返回真
-/// 2、这个int有owner，返回 owner_vm_id == vcpu_vm_id && owner_vcpu_id == vcpu_id 
-pub fn vgic_int_get_owner<V: VcpuTrait<Vm> + Clone >(vcpu: &V, interrupt: &VgicInt<V>) -> bool {
-    let vcpu_id = vcpu.id();
-    let vcpu_vm_id = vcpu.vm_id();
-
-    match interrupt.owner() {
-        Some(owner) => {
-            let owner_vcpu_id = owner.id();
-            let owner_vm_id = owner.vm_id();
-
-            owner_vm_id == vcpu_vm_id && owner_vcpu_id == vcpu_id
-        }
-        None => {
-            interrupt.set_owner(vcpu.clone());
-            true
-        }
-    }
-}
-
-pub fn vgic_get_state<V: VcpuTrait<Vm> + Clone>(interrupt: &VgicInt<V>) -> usize {
-    let mut state = interrupt.state().to_num();
-
-    if interrupt.in_lr() && interrupt.owner_phys_id().unwrap() == current_cpu().id() {
-        let lr_option = gich_get_lr(interrupt);
-        if let Some(lr_val) = lr_option {
-            state = lr_val as usize;
-        }
-    }
-
-    if interrupt.id() as usize >= GIC_SGIS_NUM {
-        return state;
-    }
-    if interrupt.owner().is_none() {
-        return state;
-    }
-
-    let vm = interrupt.owner_vm();
-    let vgic = vm.get_vgic();
-    let vcpu_id = interrupt.owner_id().unwrap();
-
-    if vgic.cpu_priv_sgis_pend(vcpu_id, interrupt.id() as usize) != 0 {
-        state |= 1;
-    }
-
-    state
-}
-
-// vcpu_id, pcpu_id
-pub fn vgic_int_yield_owner<V: VcpuTrait<Vm> + Clone>(vcpu: &V, interrupt: &VgicInt<V>) {
-    if !vgic_owns(vcpu, interrupt) || interrupt.in_lr() || gic_is_priv(interrupt.id() as usize) {
-        return;
-    }
-
-    if vgic_get_state(interrupt) & 2 == 0 {
-        interrupt.clear_owner();
-    }
-}
-
 pub fn vgic_int_is_hw<V: VcpuTrait<Vm>>(interrupt: &VgicInt<V>) -> bool {
     interrupt.id() as usize >= GIC_SGIS_NUM && interrupt.hw()
-}
-
-fn gich_get_lr<V: VcpuTrait<Vm>>(interrupt: &VgicInt<V>) -> Option<u32> {
-    let cpu_id = current_cpu().id();
-    let phys_id = interrupt.owner_phys_id().unwrap();
-
-    if !interrupt.in_lr() || phys_id != cpu_id {
-        return None;
-    }
-
-    let lr_val = GicHypervisorInterface::lr(interrupt.lr() as usize);
-    if (lr_val & 0b1111111111 == interrupt.id() as u32) && (lr_val >> 28 & 0b11 != 0) {
-        return Some(lr_val);
-    }
-    None
 }
 
 

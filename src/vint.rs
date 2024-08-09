@@ -15,7 +15,8 @@ use crate::vgic_traits::PcpuTrait;
 use crate::vgic_traits::VcpuTrait;
 
 pub struct VgicInt<V>
-where V: VcpuTrait<Vm> 
+    where 
+    V: VcpuTrait<Vm> 
 {
     inner_const: VgicIntInnerConst,
     inner: Mutex<VgicIntInnerMut<V>>,
@@ -264,3 +265,105 @@ impl<V: VcpuTrait<Vm> > VgicInt<V> {
     }
 }
 
+
+
+use crate::GicHypervisorInterface;
+use crate::vgic_traits::VmTrait;
+
+
+
+// 只考虑 spi 
+pub fn vgic_int_owns<V: VcpuTrait<Vm> + Clone>(vcpu: &V, interrupt: &VgicInt<V>) -> bool {
+    // sgi ppi 
+    if gic_is_priv(interrupt.id() as usize) {
+        return true;
+    }
+
+    let vcpu_id = vcpu.id();
+    let pcpu_id = vcpu.phys_id();
+    match interrupt.owner() {
+        Some(owner) => { 
+            let owner_vcpu_id = owner.id();
+            let owner_pcpu_id = owner.phys_id();
+            owner_vcpu_id == vcpu_id && owner_pcpu_id == pcpu_id
+        }
+        None => false,
+    }
+}
+
+// vcpu_id, pcpu_id
+pub fn vgic_int_yield_owner<V: VcpuTrait<Vm> + Clone>(vcpu: &V, interrupt: &VgicInt<V>) {
+    if !vgic_int_owns(vcpu, interrupt) || interrupt.in_lr() || gic_is_priv(interrupt.id() as usize) {
+        return;
+    }
+
+    if vgic_get_state(interrupt) & 2 == 0 {
+        interrupt.clear_owner();
+    }
+}
+
+/// 1、这个int没有owner的话，设置当前vcpu为他的主人  返回真
+/// 2、这个int有owner，返回 owner_vm_id == vcpu_vm_id && owner_vcpu_id == vcpu_id 
+pub fn vgic_int_get_owner<V: VcpuTrait<Vm> + Clone>(vcpu: &V, interrupt: &VgicInt<V>) -> bool {
+    let vcpu_id = vcpu.id();
+    let vcpu_vm_id = vcpu.vm_id();
+
+    match interrupt.owner() {
+        Some(owner) => {
+            let owner_vcpu_id = owner.id();
+            let owner_vm_id = owner.vm_id();
+
+            owner_vm_id == vcpu_vm_id && owner_vcpu_id == vcpu_id
+        }
+        None => {
+            interrupt.set_owner(vcpu.clone());
+            true
+        }
+    }
+}
+
+
+
+pub fn vgic_get_state<V: VcpuTrait<Vm> + Clone>(interrupt: &VgicInt<V>) -> usize {
+    let mut state = interrupt.state().to_num();
+
+    if interrupt.in_lr() && interrupt.owner_phys_id().unwrap() == current_cpu().id() {
+        let lr_option = gich_get_lr(interrupt);
+        if let Some(lr_val) = lr_option {
+            state = lr_val as usize;
+        }
+    }
+
+    if interrupt.id() as usize >= GIC_SGIS_NUM {
+        return state;
+    }
+    if interrupt.owner().is_none() {
+        return state;
+    }
+
+    let vm = interrupt.owner_vm();
+    let vgic = vm.get_vgic();
+    let vcpu_id = interrupt.owner_id().unwrap();
+
+    if vgic.cpu_priv_sgis_pend(vcpu_id, interrupt.id() as usize) != 0 {
+        state |= 1;
+    }
+
+    state
+}
+
+
+pub fn gich_get_lr<V: VcpuTrait<Vm>>(interrupt: &VgicInt<V>) -> Option<u32> {
+    let cpu_id = current_cpu().id();
+    let phys_id = interrupt.owner_phys_id().unwrap();
+
+    if !interrupt.in_lr() || phys_id != cpu_id {
+        return None;
+    }
+
+    let lr_val = GicHypervisorInterface::lr(interrupt.lr() as usize);
+    if (lr_val & 0b1111111111 == interrupt.id() as u32) && (lr_val >> 28 & 0b11 != 0) {
+        return Some(lr_val);
+    }
+    None
+}

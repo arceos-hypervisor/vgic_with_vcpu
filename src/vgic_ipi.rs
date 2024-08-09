@@ -1,6 +1,6 @@
 
-use crate::vgic::vgic_int_yield_owner;
-use crate::vgic::vgic_int_get_owner;
+use crate::vint::vgic_int_yield_owner;
+use crate::vint::vgic_int_get_owner;
 use crate::GicHypervisorInterface;
 use crate::utils::bit_extract;
 extern crate alloc;
