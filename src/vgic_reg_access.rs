@@ -53,7 +53,7 @@ pub fn vgicd_emu_access_is_vaild(emu_ctx: &EmuContext) -> bool {
     true
 }
 
-impl  <V: VcpuTrait<Vm> + Clone> Vgic<V> {
+impl  <V: VcpuTrait + Clone> Vgic<V> {
     /* set gpr get gpr */
     /* 找到当前活跃 vm ，向其vcpu发送ipi，保证ctrlr同步 */
     fn emu_ctrl_access (&self, emu_ctx: &EmuContext, vcpu: &V) {
@@ -166,7 +166,9 @@ impl  <V: VcpuTrait<Vm> + Clone> Vgic<V> {
         let idx = emu_ctx.reg;
         let mut val = if emu_ctx.write { vcpu.get_gpr(idx) } else { 0 };
         let first_int = reg_idx * 32;
-        vcpu.vm();
+        
+        //vcpu.vm();
+        
         let vm_id = active_vm_id();
         let vm = match active_vm() {
             Some(vm) => vm,
@@ -519,7 +521,7 @@ impl  <V: VcpuTrait<Vm> + Clone> Vgic<V> {
 }
 
 
-impl <V: VcpuTrait<Vm> + Clone> Vgic<V> {
+impl <V: VcpuTrait + Clone> Vgic<V> {
 
     fn emu_type(&self) -> EmuDeviceType {
         EmuDeviceType::EmuDeviceTGicd

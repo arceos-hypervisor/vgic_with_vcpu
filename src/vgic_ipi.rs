@@ -26,7 +26,8 @@ pub fn vgic_ipi_handler(msg: IpiMessage) {
         };
         // TODO: restore_vcpu_gic(current_cpu().active_vcpu.clone(), trgt_vcpu.clone());
 
-        let vm = match trgt_vcpu.vm() {
+        /// ajax:  how to do this ????
+        let vm = match trgt_vcpu.vm.upgrade() {
             None => {
                 panic!("vgic_ipi_handler: vm is None");
             }

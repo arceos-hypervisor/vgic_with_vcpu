@@ -14,12 +14,12 @@ pub trait VmTrait {
 
     fn emu_has_interrupt(&self, _id: usize) -> bool;
 
-    fn get_vgic(&self) -> &Vgic<Vcpu> ;
+    // fn get_vgic(&self) -> &Vgic<Vcpu> ;
 }
 
 
 /* 定义trait */
-pub trait VcpuTrait <M> {
+pub trait VcpuTrait {
 
     fn id(&self) -> usize;
 
@@ -27,7 +27,7 @@ pub trait VcpuTrait <M> {
 
     fn phys_id(&self) -> usize;
 
-    fn vm(&self) -> Option<Arc<M>> ;
+    // fn vm(&self) -> Option<Arc<M>> ;
 
     fn get_gpr(&self, idx: usize) -> usize;
     

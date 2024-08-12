@@ -17,7 +17,7 @@ use crate::vgic_traits::VcpuTrait;
 use crate::vgic_traits::VmTrait;
 
 // for maintenance
-impl  <V: VcpuTrait<Vm> + Clone> Vgic<V> {
+impl  <V: VcpuTrait + Clone> Vgic<V> {
     // vcpu_id
     // 得到vcpu的cpu_priv的 pend_list.front act_list.front
     pub fn int_list_head(&self, vcpu_id: usize, is_pend: bool) -> Option<&VgicInt<V>> {

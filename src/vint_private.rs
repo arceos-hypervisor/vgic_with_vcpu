@@ -20,13 +20,13 @@ use crate::VcpuTrait;
 
 pub struct VgicCpuPriv<V>
     where
-    V: VcpuTrait<Vm>,
+    V: VcpuTrait,
 {
     pub interrupts: Vec<VgicInt<V>>,
     pub inner_mut: RefCell<VgicCpuPrivMut<V>>,
 }
 
-pub struct VgicCpuPrivMut <V: VcpuTrait<Vm>> {
+pub struct VgicCpuPrivMut <V: VcpuTrait> {
     pub curr_lrs: [u16; GIC_LIST_REGS_NUM],
     pub sgis: [Sgis; GIC_SGIS_NUM],
 
@@ -34,7 +34,7 @@ pub struct VgicCpuPrivMut <V: VcpuTrait<Vm>> {
     pub act_list: VecDeque<NonNull<VgicInt<V>>>,
 }
 
-impl <V: VcpuTrait<Vm>> VgicCpuPrivMut <V> {
+impl <V: VcpuTrait> VgicCpuPrivMut <V> {
     fn queue_remove(list: &mut VecDeque<NonNull<VgicInt<V>>>, interrupt: &VgicInt<V>) {
         // SAFETY: All VgicInt are allocated when initializing, so it's safe to convert them to NonNull
         list.iter()
@@ -67,7 +67,7 @@ impl <V: VcpuTrait<Vm>> VgicCpuPrivMut <V> {
 unsafe impl Send for VgicCpuPriv <Vcpu> {}
 unsafe impl Sync for VgicCpuPriv <Vcpu> {}
 
-impl<V: VcpuTrait<Vm>> VgicCpuPriv<V> {
+impl<V: VcpuTrait> VgicCpuPriv<V> {
     pub fn default() -> VgicCpuPriv<V> {
         VgicCpuPriv {
             interrupts: Vec::new(),

@@ -61,7 +61,7 @@ use crate::vgic_traits::PcpuTrait;
 use crate::vgic_traits::VcpuTrait;
 
 pub struct Vgicd<V> 
-    where V: VcpuTrait<Vm>
+    where V: VcpuTrait
 {
     // ctlr will be written among different cores, so we use AtomicU32 to guarantee thread safety
     ctlr        : AtomicU32,
@@ -71,7 +71,7 @@ pub struct Vgicd<V>
     pub interrupts  : Vec<VgicInt<V>>,
 }
 
-impl <V: VcpuTrait<Vm>> Vgicd <V> {
+impl <V: VcpuTrait> Vgicd <V> {
     fn new(cpu_num: usize) -> Vgicd <V> {
         let vgg = config::VGG.lock().unwrap();
         Vgicd {
@@ -87,14 +87,14 @@ impl <V: VcpuTrait<Vm>> Vgicd <V> {
 
 
 pub struct Vgic<V>
-    where V: VcpuTrait<Vm> 
+    where V: VcpuTrait
 {   
     pub address_range: Range<usize>,
     pub vgicd: Vgicd<V>,
     pub cpu_priv: Vec<vint_private::VgicCpuPriv<V>>,  // 0..32
 }
 
-impl <V: VcpuTrait<Vm>> Vgic <V> {
+impl <V: VcpuTrait> Vgic <V> {
     pub fn new(base: usize, length: usize, cpu_num: usize) -> Vgic <V> {
         Vgic {
             address_range: base..base + length,
@@ -235,7 +235,7 @@ impl <V: VcpuTrait<Vm>> Vgic <V> {
     }
 }
 
-impl <V: VcpuTrait<Vm> + Clone> Vgic <V> {
+impl <V: VcpuTrait + Clone> Vgic <V> {
 
     fn sgi_set_pend(&self, vcpu: &V, int_id: usize, pend: bool) {
         if bit_extract(int_id, 0, 10) > GIC_SGIS_NUM {
@@ -839,7 +839,7 @@ fn cpuid_to_cpuif(cpuid: usize) -> usize {
     cpuid
 }
 
-pub fn vgic_int_is_hw<V: VcpuTrait<Vm>>(interrupt: &VgicInt<V>) -> bool {
+pub fn vgic_int_is_hw<V: VcpuTrait>(interrupt: &VgicInt<V>) -> bool {
     interrupt.id() as usize >= GIC_SGIS_NUM && interrupt.hw()
 }
 

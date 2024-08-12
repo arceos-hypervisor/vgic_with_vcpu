@@ -126,11 +126,10 @@ impl VmTrait for Vm {
         }
     }
     
-    //pub fn cpu_num(&self) -> usize { self.vcpu_list.len() }
     fn has_interrupt(&self, _id: usize) -> bool {true}
     fn emu_has_interrupt(&self, _id: usize) -> bool {true}
-    fn get_vgic(&self) -> &Vgic<Vcpu> {  &self.emu_devs[0] }
-
+    // fn get_vgic(&self) -> &Vgic<Vcpu> {  &self.emu_devs[0] }
+    // pub fn cpu_num(&self) -> usize { self.vcpu_list.len() }
 }
 
 /* ============================================================================ */
@@ -150,8 +149,8 @@ impl VmTrait for Vm {
 }
 
 /* 实现trait */
-impl VcpuTrait<Vm> for  Vcpu {
-    fn vm(&self) -> Option<Arc<Vm>> { self.vm.upgrade() }
+impl VcpuTrait for  Vcpu {
+    // fn vm(&self) -> Option<Arc<Vm>> { self.vm.upgrade() }
     
     fn id(&self) -> usize { self.id }
     fn vm_id(&self) ->usize { self.vm_id }
@@ -221,10 +220,11 @@ pub fn active_vm_id() -> usize {
 }
 /* nothing */
 pub fn active_vm() -> Option<Arc<Vm>> {
-    match current_cpu().active_vcpu.as_ref() {
-        None => None,
-        Some(active_vcpu) => active_vcpu.vm(),
-    } 
+    None
+    // match current_cpu().active_vcpu.as_ref() {
+    //     None => None,
+    //     Some(active_vcpu) => active_vcpu.vm(),
+    // } 
 }
 
 

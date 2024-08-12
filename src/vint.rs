@@ -16,7 +16,7 @@ use crate::vgic_traits::VcpuTrait;
 
 pub struct VgicInt<V>
     where 
-    V: VcpuTrait<Vm> 
+    V: VcpuTrait
 {
     inner_const: VgicIntInnerConst,
     inner: Mutex<VgicIntInnerMut<V>>,
@@ -31,7 +31,7 @@ struct VgicIntInnerConst {
     id: u16,
     hw: Cell<bool>,
 }
-pub struct VgicIntInnerMut<V: VcpuTrait<Vm>> {
+pub struct VgicIntInnerMut<V: VcpuTrait> {
     pub owner: Option<V>,
     pub in_lr: bool,
     pub lr   : u16,
@@ -42,11 +42,11 @@ pub struct VgicIntInnerMut<V: VcpuTrait<Vm>> {
     cfg      : u8,
 
     pub in_pend: bool,
-    pub in_act: bool,
+    pub in_act : bool,
 }
 
 
-impl<T: VcpuTrait<Vm>> VgicIntInnerMut<T> {
+impl<T: VcpuTrait> VgicIntInnerMut<T> {
     fn new() -> Self {
         Self {
             owner: None,
@@ -77,13 +77,13 @@ impl<T: VcpuTrait<Vm>> VgicIntInnerMut<T> {
         }
     }
 
-    fn owner_vm(&self) -> Arc<Vm> {
-        let owner = self.owner.as_ref().unwrap();
-        owner.vm().unwrap()
-    }
+    // fn owner_vm(&self) -> Arc<Vm> {
+    //     let owner = self.owner.as_ref().unwrap();
+    //     owner.vm().unwrap()
+    // }
 }
 
-impl<V: VcpuTrait<Vm> + Clone > VgicInt<V> {
+impl<V: VcpuTrait + Clone > VgicInt<V> {
 
     pub fn set_owner(&self, owner: V) {
         let mut vgic_int = self.inner.lock();
@@ -97,7 +97,7 @@ impl<V: VcpuTrait<Vm> + Clone > VgicInt<V> {
     
 }
 
-impl<V: VcpuTrait<Vm> > VgicInt<V> {
+impl<V: VcpuTrait > VgicInt<V> {
 
     pub fn new(id: usize) -> Self {
         Self {
@@ -252,10 +252,10 @@ impl<V: VcpuTrait<Vm> > VgicInt<V> {
         vgic_int.owner.as_ref().map(|owner| owner.vm_id())
     }
 
-    pub fn owner_vm(&self) -> Arc<Vm> {
-        let vgic_int = self.inner.lock();
-        vgic_int.owner_vm()
-    }
+    // pub fn owner_vm(&self) -> Arc<Vm> {
+    //     let vgic_int = self.inner.lock();
+    //     vgic_int.owner_vm()
+    // }
 
     pub fn locked_helper<F>(&self, f: F)
     where
@@ -273,7 +273,7 @@ use crate::vgic_traits::VmTrait;
 
 
 // 只考虑 spi 
-pub fn vgic_int_owns<V: VcpuTrait<Vm> + Clone>(vcpu: &V, interrupt: &VgicInt<V>) -> bool {
+pub fn vgic_int_owns<V: VcpuTrait + Clone>(vcpu: &V, interrupt: &VgicInt<V>) -> bool {
     // sgi ppi 
     if gic_is_priv(interrupt.id() as usize) {
         return true;
@@ -292,7 +292,7 @@ pub fn vgic_int_owns<V: VcpuTrait<Vm> + Clone>(vcpu: &V, interrupt: &VgicInt<V>)
 }
 
 // vcpu_id, pcpu_id
-pub fn vgic_int_yield_owner<V: VcpuTrait<Vm> + Clone>(vcpu: &V, interrupt: &VgicInt<V>) {
+pub fn vgic_int_yield_owner<V: VcpuTrait + Clone>(vcpu: &V, interrupt: &VgicInt<V>) {
     if !vgic_int_owns(vcpu, interrupt) || interrupt.in_lr() || gic_is_priv(interrupt.id() as usize) {
         return;
     }
@@ -304,7 +304,7 @@ pub fn vgic_int_yield_owner<V: VcpuTrait<Vm> + Clone>(vcpu: &V, interrupt: &Vgic
 
 /// 1、这个int没有owner的话，设置当前vcpu为他的主人  返回真
 /// 2、这个int有owner，返回 owner_vm_id == vcpu_vm_id && owner_vcpu_id == vcpu_id 
-pub fn vgic_int_get_owner<V: VcpuTrait<Vm> + Clone>(vcpu: &V, interrupt: &VgicInt<V>) -> bool {
+pub fn vgic_int_get_owner<V: VcpuTrait + Clone>(vcpu: &V, interrupt: &VgicInt<V>) -> bool {
     let vcpu_id = vcpu.id();
     let vcpu_vm_id = vcpu.vm_id();
 
@@ -322,9 +322,7 @@ pub fn vgic_int_get_owner<V: VcpuTrait<Vm> + Clone>(vcpu: &V, interrupt: &VgicIn
     }
 }
 
-
-
-pub fn vgic_get_state<V: VcpuTrait<Vm> + Clone>(interrupt: &VgicInt<V>) -> usize {
+pub fn vgic_get_state<V: VcpuTrait + Clone>(interrupt: &VgicInt<V>) -> usize {
     let mut state = interrupt.state().to_num();
 
     if interrupt.in_lr() && interrupt.owner_phys_id().unwrap() == current_cpu().id() {
@@ -341,6 +339,7 @@ pub fn vgic_get_state<V: VcpuTrait<Vm> + Clone>(interrupt: &VgicInt<V>) -> usize
         return state;
     }
 
+    /*
     let vm = interrupt.owner_vm();
     let vgic = vm.get_vgic();
     let vcpu_id = interrupt.owner_id().unwrap();
@@ -348,12 +347,12 @@ pub fn vgic_get_state<V: VcpuTrait<Vm> + Clone>(interrupt: &VgicInt<V>) -> usize
     if vgic.cpu_priv_sgis_pend(vcpu_id, interrupt.id() as usize) != 0 {
         state |= 1;
     }
+    */
 
     state
 }
 
-
-pub fn gich_get_lr<V: VcpuTrait<Vm>>(interrupt: &VgicInt<V>) -> Option<u32> {
+pub fn gich_get_lr<V: VcpuTrait>(interrupt: &VgicInt<V>) -> Option<u32> {
     let cpu_id = current_cpu().id();
     let phys_id = interrupt.owner_phys_id().unwrap();
 
