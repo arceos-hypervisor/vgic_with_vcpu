@@ -3,12 +3,12 @@ use crate::vgic::Vgic;
 use alloc::sync::Arc;
 
 
-pub trait VmTrait {
+pub trait VmTrait<V> {
     fn id(&self) -> usize;
 
-    fn vcpu_list(&self) -> &[Vcpu] ;
+    fn vcpu_list(&self) -> &[V] ;
     
-    fn vcpu(&self, id :usize) -> Option<&Vcpu>;
+    fn vcpu(&self, id :usize) -> Option<&V>;
 
     fn has_interrupt(&self, _id: usize) -> bool;
 

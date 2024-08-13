@@ -105,7 +105,7 @@ impl Vm {
 }
 
 /* 实现trait */
-impl VmTrait for Vm {
+impl VmTrait<Vcpu> for Vm {
 
     fn id(&self) -> usize { self.id }
     fn vcpu_list(&self) -> &[Vcpu] { &self.vcpu_list }

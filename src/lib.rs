@@ -6,8 +6,8 @@
 
 mod config;
 mod gich;
-mod vint;
-mod vint_private;
+pub mod vint;
+pub mod vint_private;
 mod vgic;
 mod vgic_maintence;
 mod vgic_reg_access;
@@ -24,19 +24,19 @@ use gich::*;
 
 extern crate alloc;
 use alloc::vec::Vec;
-use vgic::Vgic;
+pub use vgic::Vgic;
 
 use crate::config::VgicGlobal;
 use arm_gic::gic_v2::GicDistributor;
-use crate::vgic_maintence::gic_maintenance_handler;
+// use crate::vgic_maintence::gic_maintenance_handler;
 // use crate::vgic::vgic_set_hw_int;
 // use crate::vgic::emu_intc_init;
 use crate::vint::*;
 use crate::consts::*;
 use alloc::sync::Arc;
 
-use crate::vgic_traits::VcpuTrait;
-use crate::vgic_traits::VmTrait;
+pub use crate::vgic_traits::VcpuTrait;
+pub use crate::vgic_traits::VmTrait;
 
 use lazy_static::lazy_static;
 use axsync::Mutex;
@@ -46,9 +46,9 @@ lazy_static! {
 }
 use alloc::sync::Weak;
 
-
+/*
 // init intc for a vm
-pub fn emu_intc_init(base_ipa: usize, length: usize, vcpu_list: &[Vcpu]) -> Result<Arc<Vgic<Vcpu>>, ()> {
+pub fn emu_intc_init<V: VcpuTrait>(base_ipa: usize, length: usize, vcpu_list: &[V]) -> Result<Arc<Vgic<V>>, ()> {
 
     let vcpu_num = vcpu_list.len();
     let mut vgic = Vgic::new(base_ipa, length, vcpu_num);
@@ -76,7 +76,10 @@ pub fn emu_intc_init(base_ipa: usize, length: usize, vcpu_list: &[Vcpu]) -> Resu
 
     Ok(Arc::new(vgic))
 }
+*/
 
+
+/*
 pub fn vgic_set_hw_int(vm: &Vm, int_id: usize) {
     // soft
     if int_id < GIC_SGIS_NUM {
@@ -101,7 +104,7 @@ pub fn vgic_set_hw_int(vm: &Vm, int_id: usize) {
         drop(interrupt_lock);
     }
 }
-
+*/
 
 
 // static STATE: AtomicUsize = AtomicUsize::new(0);
@@ -119,11 +122,13 @@ pub fn vgic_init(gich_base: * mut u8)
     };
     VgicGlobal::new(vgg);
 
+    /*
     let mut vcpu = Vec::new();
     vcpu.push(Vcpu{id:0, phys_id:0, vm_id:0, vm: Weak::new()});
     let vgic_dev = emu_intc_init(1, 1, &vcpu).unwrap();
+    */
 
-
+    /*
     VM0.lock().vcpu_list = vcpu.clone();
     VM0.lock().emu_devs.push(vgic_dev);
 
@@ -135,6 +140,7 @@ pub fn vgic_init(gich_base: * mut u8)
 
 
     gic_maintenance_handler();
+    */
 }
 
 

@@ -158,6 +158,7 @@ impl  <V: VcpuTrait + Clone> Vgic<V> {
         }
 }
 
+/*
 pub fn gic_maintenance_handler() {
     let misr = GicHypervisorInterface::misr();
     let vm = match active_vm() {
@@ -186,3 +187,4 @@ pub fn gic_maintenance_handler() {
         }
     }
 }
+*/

@@ -10,7 +10,7 @@ use crate::vgic_traits::VcpuTrait;
 use crate::vgic_traits::PcpuTrait;
 use crate::vgic_traits::VmTrait;
 
-
+/*
 pub fn vgic_ipi_handler(msg: IpiMessage) {
     if let IpiInnerMsg::Initc(intc) = msg.ipi_message {
         let vm_id = intc.vm_id;
@@ -81,3 +81,4 @@ pub fn vgic_ipi_handler(msg: IpiMessage) {
         // error!("vgic_ipi_handler: illegal ipi");
     }
 }
+*/
