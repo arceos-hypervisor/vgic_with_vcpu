@@ -76,9 +76,9 @@ impl <V: VcpuTrait> Vgicd <V> {
         let vgg = config::VGG.lock().unwrap();
         Vgicd {
             ctlr: AtomicU32::new(0b10),
-            typer: (vgg.typer & GICD_TYPER_CPUNUM_MSK as u32)  |
+            typer: (GicDistributor::get_typer() & GICD_TYPER_CPUNUM_MSK as u32)  |
                    (((cpu_num - 1) << GICD_TYPER_CPUNUM_OFF) & GICD_TYPER_CPUNUM_MSK) as u32,
-            iidr:  vgg.iidr,
+            iidr:  GicDistributor::get_iidr(),
             interrupts: Vec::new(),
         }
     }
