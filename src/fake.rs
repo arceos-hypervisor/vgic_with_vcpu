@@ -68,13 +68,13 @@ impl Vm {
     /* 下面四个函数 targetr 和 sgi 要用 */
 
     pub fn vcpuid_to_pcpuid(&self, vcpuid: usize) -> Result<usize, ()> {
-        self.vcpu_list.get(vcpuid).map(|vcpu| vcpu.phys_id()).ok_or(())
+        self.vcpu_list.get(vcpuid).map(|vcpu| vcpu.if_phys_id()).ok_or(())
     }
 
     pub fn pcpuid_to_vcpuid(&self, pcpuid: usize) -> Result<usize, ()> {
         for vcpu in &self.vcpu_list {
-            if vcpu.phys_id() == pcpuid {
-                return Ok(vcpu.id());
+            if vcpu.if_phys_id() == pcpuid {
+                return Ok(vcpu.if_id());
             }
         }
         Err(())
@@ -107,27 +107,27 @@ impl Vm {
 /* 实现trait */
 impl VmTrait<Vcpu> for Vm {
 
-    fn id(&self) -> usize { self.id }
-    fn vcpu_list(&self) -> &[Vcpu] { &self.vcpu_list }
-    fn vcpu(&self, id :usize) -> Option<&Vcpu> {
-        match self.vcpu_list().get(id) {
-            Some(vcpu) => {
-                assert_eq!(id, vcpu.id());
-                Some(vcpu)
-            }
-            None => {
-                log::error!(
-                    "vcpu idx {} is to large than vcpu_list len {}",
-                    id,
-                    self.vcpu_list().len()
-                );
-                None
-            }
-        }
-    }
+    fn if_id(&self) -> usize { self.id }
+    // fn if_vcpu_list(&self) -> &[Vcpu] { &self.vcpu_list }
+    // fn if_vcpu(&self, id :usize) -> Option<&Vcpu> {
+    //     match self.if_vcpu_list().get(id) {
+    //         Some(vcpu) => {
+    //             assert_eq!(id, vcpu.id());
+    //             Some(vcpu)
+    //         }
+    //         None => {
+    //             log::error!(
+    //                 "vcpu idx {} is to large than vcpu_list len {}",
+    //                 id,
+    //                 self.if_vcpu_list().len()
+    //             );
+    //             None
+    //         }
+    //     }
+    // }
     
-    fn has_interrupt(&self, _id: usize) -> bool {true}
-    fn emu_has_interrupt(&self, _id: usize) -> bool {true}
+    fn if_has_interrupt(&self, _id: usize) -> bool {true}
+    fn if_emu_has_interrupt(&self, _id: usize) -> bool {true}
     // fn get_vgic(&self) -> &Vgic<Vcpu> {  &self.emu_devs[0] }
     // pub fn cpu_num(&self) -> usize { self.vcpu_list.len() }
 }
@@ -152,12 +152,12 @@ impl VmTrait<Vcpu> for Vm {
 impl VcpuTrait for  Vcpu {
     // fn vm(&self) -> Option<Arc<Vm>> { self.vm.upgrade() }
     
-    fn id(&self) -> usize { self.id }
-    fn vm_id(&self) ->usize { self.vm_id }
-    fn phys_id(&self) ->usize { self.phys_id }
+    fn if_id(&self) -> usize { self.id }
+    fn if_vm_id(&self) ->usize { self.vm_id }
+    fn if_phys_id(&self) ->usize { self.phys_id }
 
-    fn get_gpr(&self, idx: usize) -> usize {0}
-    fn set_gpr(&self, idx: usize, val: usize) {}
+    fn if_get_gpr(&self, idx: usize) -> usize {0}
+    fn if_set_gpr(&mut self, idx: usize, val: usize) {}
 }
 
 /* ============================================================================ */
@@ -216,7 +216,7 @@ impl PcpuTrait<Vcpu>  for Pcpu {
 /* nothing */
 pub fn active_vm_id() -> usize {
     let vm = active_vm().unwrap();
-    vm.id()
+    vm.if_id()
 }
 /* nothing */
 pub fn active_vm() -> Option<Arc<Vm>> {

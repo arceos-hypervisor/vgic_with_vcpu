@@ -96,8 +96,8 @@ impl  <V: VcpuTrait + Clone> Vgic<V> {
         while lr_idx_opt.is_some() {
             let mut interrupt_opt: Option<&VgicInt<V>> = None;
             let mut prev_pend = false;
-            let act_head = self.int_list_head(vcpu.id(), false);
-            let pend_head = self.int_list_head(vcpu.id(), true);
+            let act_head = self.int_list_head(vcpu.if_id(), false);
+            let pend_head = self.int_list_head(vcpu.if_id(), true);
             if has_pending {
                 if let Some(act_int) = act_head {
                     if !act_int.in_lr() {
@@ -141,13 +141,13 @@ impl  <V: VcpuTrait + Clone> Vgic<V> {
 
     // maintenance use
     fn eoir_highest_spilled_active(&self, vcpu: &V) {
-            if let Some(int) = self.int_list_head(vcpu.id(), false) {
+            if let Some(int) = self.int_list_head(vcpu.if_id(), false) {
                 int.lock.lock();
                 vgic_int_get_owner(vcpu, int);
     
                 let state = int.state().to_num();
                 int.set_state(IrqState::num_to_state(state & !2));
-                self.update_int_list(vcpu.id(), int);
+                self.update_int_list(vcpu.if_id(), int);
     
                 if vgic_int_is_hw(int) {
                     GicDistributor::set_act(int.id() as usize, false);

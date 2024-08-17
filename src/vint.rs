@@ -233,13 +233,13 @@ impl<V: VcpuTrait > VgicInt<V> {
 
     pub fn owner_phys_id(&self) -> Option<usize> {
         let vgic_int = self.inner.lock();
-        vgic_int.owner.as_ref().map(|owner| owner.phys_id())
+        vgic_int.owner.as_ref().map(|owner| owner.if_phys_id())
     }
 
     pub fn owner_id(&self) -> Option<usize> {
         let vgic_int = self.inner.lock();
         match &vgic_int.owner {
-            Some(owner) => Some(owner.id()),
+            Some(owner) => Some(owner.if_id()),
             None => {
                 // warn!("owner_id is None");
                 None
@@ -249,7 +249,7 @@ impl<V: VcpuTrait > VgicInt<V> {
 
     fn owner_vm_id(&self) -> Option<usize> {
         let vgic_int = self.inner.lock();
-        vgic_int.owner.as_ref().map(|owner| owner.vm_id())
+        vgic_int.owner.as_ref().map(|owner| owner.if_vm_id())
     }
 
     // pub fn owner_vm(&self) -> Arc<Vm> {
@@ -279,12 +279,12 @@ pub fn vgic_int_owns<V: VcpuTrait + Clone>(vcpu: &V, interrupt: &VgicInt<V>) -> 
         return true;
     }
 
-    let vcpu_id = vcpu.id();
-    let pcpu_id = vcpu.phys_id();
+    let vcpu_id = vcpu.if_id();
+    let pcpu_id = vcpu.if_phys_id();
     match interrupt.owner() {
         Some(owner) => { 
-            let owner_vcpu_id = owner.id();
-            let owner_pcpu_id = owner.phys_id();
+            let owner_vcpu_id = owner.if_id();
+            let owner_pcpu_id = owner.if_phys_id();
             owner_vcpu_id == vcpu_id && owner_pcpu_id == pcpu_id
         }
         None => false,
@@ -305,13 +305,13 @@ pub fn vgic_int_yield_owner<V: VcpuTrait + Clone>(vcpu: &V, interrupt: &VgicInt<
 /// 1、这个int没有owner的话，设置当前vcpu为他的主人  返回真
 /// 2、这个int有owner，返回 owner_vm_id == vcpu_vm_id && owner_vcpu_id == vcpu_id 
 pub fn vgic_int_get_owner<V: VcpuTrait + Clone>(vcpu: &V, interrupt: &VgicInt<V>) -> bool {
-    let vcpu_id = vcpu.id();
-    let vcpu_vm_id = vcpu.vm_id();
+    let vcpu_id = vcpu.if_id();
+    let vcpu_vm_id = vcpu.if_vm_id();
 
     match interrupt.owner() {
         Some(owner) => {
-            let owner_vcpu_id = owner.id();
-            let owner_vm_id = owner.vm_id();
+            let owner_vcpu_id = owner.if_id();
+            let owner_vm_id = owner.if_vm_id();
 
             owner_vm_id == vcpu_vm_id && owner_vcpu_id == vcpu_id
         }

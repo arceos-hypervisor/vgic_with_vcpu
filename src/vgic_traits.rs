@@ -4,15 +4,15 @@ use alloc::sync::Arc;
 
 
 pub trait VmTrait<V> {
-    fn id(&self) -> usize;
+    fn if_id(&self) -> usize;
 
-    fn vcpu_list(&self) -> &[V] ;
+    // fn if_vcpu_list(&self) -> &[V] ;
     
-    fn vcpu(&self, id :usize) -> Option<&V>;
+    // fn if_vcpu(&self, id :usize) -> Option<&V>;
 
-    fn has_interrupt(&self, _id: usize) -> bool;
+    fn if_has_interrupt(&self, _id: usize) -> bool;
 
-    fn emu_has_interrupt(&self, _id: usize) -> bool;
+    fn if_emu_has_interrupt(&self, _id: usize) -> bool;
 
     // fn get_vgic(&self) -> &Vgic<Vcpu> ;
 }
@@ -21,17 +21,17 @@ pub trait VmTrait<V> {
 /* 定义trait */
 pub trait VcpuTrait {
 
-    fn id(&self) -> usize;
+    fn if_id(&self) -> usize;
 
-    fn vm_id(&self) -> usize;
+    fn if_vm_id(&self) -> usize;
 
-    fn phys_id(&self) -> usize;
+    fn if_phys_id(&self) -> usize;
 
     // fn vm(&self) -> Option<Arc<M>> ;
 
-    fn get_gpr(&self, idx: usize) -> usize;
+    fn if_get_gpr(&self, idx: usize) -> usize;
     
-    fn set_gpr(&self, idx: usize, val: usize);
+    fn if_set_gpr(&mut self, idx: usize, val: usize);
 }
 
 /* 定义trait */

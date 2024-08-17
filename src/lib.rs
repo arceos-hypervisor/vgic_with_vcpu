@@ -19,6 +19,9 @@ mod vgic_state;
 
 mod fake;
 
+use arm_gic::GicCpuInterface;
+use arm_gic::GICD;
+use arm_gic::GICC;
 use fake::*;
 use gich::*;
 
@@ -108,10 +111,14 @@ pub fn vgic_set_hw_int(vm: &Vm, int_id: usize) {
 
 
 // static STATE: AtomicUsize = AtomicUsize::new(0);
-pub fn vgic_init(gich_base: * mut u8) 
+pub fn vgic_init() 
 {
-    GicHypervisorInterface::init_base(gich_base);
+
+    use log::debug;
+    GicHypervisorInterface::init_base(0x803_0000 as * mut u8);
     GicHypervisorInterface::init();
+    debug!("this -----==========-----");
+    
     
     let vgg = VgicGlobal {
         nr_lr: 1,
