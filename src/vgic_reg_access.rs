@@ -13,8 +13,8 @@ use core::ops::Range;
 // use crate::fake::*;
 use crate::EmuContext;
 use crate::EmuDeviceType;
-use crate::active_vm_id;
-use crate::active_vm;
+// use crate::active_vm_id;
+// use crate::active_vm;
 use crate::active_vm_ncpu;
 
 use crate::vgic_traits::VmTrait;
@@ -121,17 +121,17 @@ impl  <V: VcpuTrait + Clone> Vgic<V> {
         let idx = emu_ctx.reg;
         let mut val = if emu_ctx.write { vcpu.if_get_gpr(idx) } else { 0 };
         let first_int = reg_idx * 32;
-        let vm_id = active_vm_id();
-        let vm = match active_vm() {
-            Some(vm) => vm,
-            None => {
-                panic!("emu_isenabler_access: current vcpu.vm is none");
-            }
-        };
+        // let vm_id = active_vm_id();
+        // let vm = match active_vm() {
+        //     Some(vm) => vm,
+        //     None => {
+        //         panic!("emu_isenabler_access: current vcpu.vm is none");
+        //     }
+        // };
         let mut vm_has_interrupt_flag = false;
 
         for i in 0..32 {
-            if vm.if_has_interrupt(first_int + i) || vm.if_emu_has_interrupt(first_int + i) {
+            if self.has_interrupt(first_int + i) || self.emu_has_interrupt(first_int + i) {
                 vm_has_interrupt_flag = true;
                 break;
             }
@@ -172,17 +172,17 @@ impl  <V: VcpuTrait + Clone> Vgic<V> {
         
         //vcpu.vm();
         
-        let vm_id = active_vm_id();
-        let vm = match active_vm() {
-            Some(vm) => vm,
-            None => {
-                panic!("emu_pendr_access: current vcpu.vm is none");
-            }
-        };
+        // let vm_id = active_vm_id();
+        // let vm = match active_vm() {
+        //     Some(vm) => vm,
+        //     None => {
+        //         panic!("emu_pendr_access: current vcpu.vm is none");
+        //     }
+        // };
         let mut vm_has_interrupt_flag = false;
 
         for i in 0..emu_ctx.width {
-            if vm.if_has_interrupt(first_int + i) || vm.if_emu_has_interrupt(first_int + i) {
+            if self.has_interrupt(first_int + i) || self.emu_has_interrupt(first_int + i) {
                 vm_has_interrupt_flag = true;
                 break;
             }
@@ -227,17 +227,17 @@ impl  <V: VcpuTrait + Clone> Vgic<V> {
         let idx = emu_ctx.reg;
         let mut val = if emu_ctx.write { vcpu.if_get_gpr(idx) } else { 0 };
         let first_int = reg_idx * 32;
-        let vm_id = active_vm_id();
-        let vm = match active_vm() {
-            Some(vm) => vm,
-            None => {
-                panic!("emu_activer_access: current vcpu.vm is none");
-            }
-        };
+        // let vm_id = active_vm_id();
+        // let vm = match active_vm() {
+        //     Some(vm) => vm,
+        //     None => {
+        //         panic!("emu_activer_access: current vcpu.vm is none");
+        //     }
+        // };
         let mut vm_has_interrupt_flag = false;
 
         for i in 0..32 {
-            if vm.if_has_interrupt(first_int + i) || vm.if_emu_has_interrupt(first_int + i) {
+            if self.has_interrupt(first_int + i) || self.emu_has_interrupt(first_int + i) {
                 vm_has_interrupt_flag = true;
                 break;
             }
@@ -284,18 +284,18 @@ impl  <V: VcpuTrait + Clone> Vgic<V> {
         let idx = emu_ctx.reg;
         let mut val = if emu_ctx.write { vcpu.if_get_gpr(idx) } else { 0 };
         let first_int = reg_idx * 32;
-        let vm_id = active_vm_id();
-        let vm = match active_vm() {
-            Some(vm) => vm,
-            None => {
-                panic!("emu_activer_access: current vcpu.vm is none");
-            }
-        };
+        // let vm_id = active_vm_id();
+        // let vm = match active_vm() {
+        //     Some(vm) => vm,
+        //     None => {
+        //         panic!("emu_activer_access: current vcpu.vm is none");
+        //     }
+        // };
         let mut vm_has_interrupt_flag = false;
 
         if emu_ctx.write {
             for i in 0..32 {
-                if vm.if_has_interrupt(first_int + i) || vm.if_emu_has_interrupt(first_int + i) {
+                if self.has_interrupt(first_int + i) || self.emu_has_interrupt(first_int + i) {
                     vm_has_interrupt_flag = true;
                     break;
                 }
@@ -338,18 +338,18 @@ impl  <V: VcpuTrait + Clone> Vgic<V> {
 
     fn emu_icfgr_access (&self, emu_ctx: &EmuContext, vcpu: &mut V) {
         let first_int = (32 / GIC_CONFIG_BITS) * bit_extract(emu_ctx.address, 0, 9) / 4;
-        let vm_id = active_vm_id();
-        let vm = match active_vm() {
-            Some(vm) => vm,
-            None => {
-                panic!("emu_icfgr_access: current vcpu.vm is none");
-            }
-        };
+        // let vm_id = active_vm_id();
+        // let vm = match active_vm() {
+        //     Some(vm) => vm,
+        //     None => {
+        //         panic!("emu_icfgr_access: current vcpu.vm is none");
+        //     }
+        // };
         let mut vm_has_interrupt_flag = false;
 
         if emu_ctx.write {
             for i in 0..emu_ctx.width * 8 {
-                if vm.if_has_interrupt(first_int + i) || vm.if_emu_has_interrupt(first_int + i) {
+                if self.has_interrupt(first_int + i) || self.emu_has_interrupt(first_int + i) {
                     vm_has_interrupt_flag = true;
                     break;
                 }
@@ -452,18 +452,18 @@ impl  <V: VcpuTrait + Clone> Vgic<V> {
         let idx = emu_ctx.reg;
         let mut val = if emu_ctx.write { vcpu.if_get_gpr(idx) } else { 0 };
         let first_int = (8 / GIC_PRIO_BITS) * bit_extract(emu_ctx.address, 0, 9);
-        let vm_id = active_vm_id();
-        let vm  = match active_vm() {
-            Some(vm) => vm,
-            None => {
-                panic!("emu_ipriorityr_access: current vcpu.vm is none");
-            }
-        };
+        // let vm_id = active_vm_id();
+        // let vm  = match active_vm() {
+        //     Some(vm) => vm,
+        //     None => {
+        //         panic!("emu_ipriorityr_access: current vcpu.vm is none");
+        //     }
+        // };
         let mut vm_has_interrupt_flag = false;
 
         if emu_ctx.write {
             for i in 0..emu_ctx.width {
-                if vm.if_has_interrupt(first_int + i) || vm.if_emu_has_interrupt(first_int + i) {
+                if self.has_interrupt(first_int + i) || self.emu_has_interrupt(first_int + i) {
                     vm_has_interrupt_flag = true;
                     break;
                 }

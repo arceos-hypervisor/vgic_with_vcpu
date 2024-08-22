@@ -88,8 +88,8 @@ impl VmTrait<Vcpu> for Vm {
     //     }
     // }
     
-    fn if_has_interrupt(&self, _id: usize) -> bool {true}
-    fn if_emu_has_interrupt(&self, _id: usize) -> bool {true}
+    // fn if_has_interrupt(&self, _id: usize) -> bool {true}
+    // fn if_emu_has_interrupt(&self, _id: usize) -> bool {true}
     // fn get_vgic(&self) -> &Vgic<Vcpu> {  &self.emu_devs[0] }
     // pub fn cpu_num(&self) -> usize { self.vcpu_list.len() }
 }

@@ -63,6 +63,9 @@ use crate::IrqState;
 use crate::IpiInitcMessage;
 use crate::InitcEvent;
 
+use crate::utils::bitmap::BitAlloc;
+use crate::BitAlloc4K;
+
 pub struct Vgicd<V> 
     where V: VcpuTrait
 {
@@ -92,6 +95,8 @@ impl <V: VcpuTrait> Vgicd <V> {
 pub struct Vgic<V>
     where V: VcpuTrait
 {   
+    int_bitmap: BitAlloc4K,
+    emu_irq_map: Vec<u64>,
     pub address_range: Range<usize>,
     pub vgicd: Vgicd<V>,
     pub cpu_priv: Vec<vint_private::VgicCpuPriv<V>>,  // 0..32
@@ -101,10 +106,33 @@ pub struct Vgic<V>
 impl <V: VcpuTrait> Vgic <V> {
     pub fn new(base: usize, length: usize, cpu_num: usize) -> Vgic <V> {
         Vgic {
+            int_bitmap: BitAlloc4K::default(),
+            emu_irq_map: Vec::new(),
             address_range: base..base + length,
             vgicd: Vgicd::new(cpu_num),
             cpu_priv: Vec::new(),
         }
+    }
+
+
+    // 设置bitmap
+    pub fn set_bitmap(&mut self, idx: usize) {
+        self.int_bitmap.set(idx);
+    }
+
+    // 设置emu_irq_map
+    pub fn set_emu_irq_map(&mut self, irq_id: u64) {
+        self.emu_irq_map.push(irq_id);
+    }
+
+    // 是否存在直通中断idx
+    pub fn has_interrupt(&self, idx: usize) -> bool {
+        self.int_bitmap.get(idx) != 0
+    }
+
+    // 是否存在emu中断idx
+    pub fn emu_has_interrupt(&self, idx: usize) -> bool {
+        self.emu_irq_map.contains(&(idx as u64))
     }
 
     // vcpu_id

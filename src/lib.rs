@@ -25,6 +25,8 @@ use arm_gic::GICC;
 use fake::*;
 use gich::*;
 
+use utils::bitmap::*;
+
 extern crate alloc;
 use alloc::vec::Vec;
 pub use vgic::Vgic;

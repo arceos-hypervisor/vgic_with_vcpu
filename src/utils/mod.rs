@@ -1,6 +1,6 @@
 
 pub mod device_ref;
-
+pub mod bitmap;
 
 #[inline(always)]
 pub fn bit_extract(bits: usize, off: usize, len: usize) -> usize {
