@@ -9,7 +9,6 @@ use core::ptr::NonNull;
 use core::cell::RefCell;
 use crate::consts::*;
 
-use crate::fake::*;
 
 #[derive(Clone, Copy, Default)]
 pub struct Sgis {
@@ -64,8 +63,8 @@ impl <V: VcpuTrait> VgicCpuPrivMut <V> {
 }
 
 // SAFETY: VgicCpuPriv is only accessed on one core
-unsafe impl Send for VgicCpuPriv <Vcpu> {}
-unsafe impl Sync for VgicCpuPriv <Vcpu> {}
+// unsafe impl Send for VgicCpuPriv <Vcpu> {}
+// unsafe impl Sync for VgicCpuPriv <Vcpu> {}
 
 impl<V: VcpuTrait> VgicCpuPriv<V> {
     pub fn default() -> VgicCpuPriv<V> {

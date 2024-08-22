@@ -50,15 +50,18 @@ use crate::utils::{bit_extract, bit_get, bit_set};
 use core::sync::atomic::AtomicUsize;
 use crate::consts::*;
 use crate::vint_private;
+use arm_gic::gic_v2::GicDistributor;
 use crate::GicHypervisorInterface;
 use crate::vint::*;
 use crate::config;
 
-use crate::fake::*;
-use arm_gic::gic_v2::GicDistributor;
 
 use crate::vgic_traits::PcpuTrait;
 use crate::vgic_traits::VcpuTrait;
+
+use crate::IrqState;
+use crate::IpiInitcMessage;
+use crate::InitcEvent;
 
 pub struct Vgicd<V> 
     where V: VcpuTrait
@@ -73,7 +76,7 @@ pub struct Vgicd<V>
 
 impl <V: VcpuTrait> Vgicd <V> {
     fn new(cpu_num: usize) -> Vgicd <V> {
-        let vgg = config::VGG.lock().unwrap();
+        // let vgg = config::VGG.lock().unwrap();
         Vgicd {
             ctlr: AtomicU32::new(0b10),
             typer: (GicDistributor::get_typer() & GICD_TYPER_CPUNUM_MSK as u32)  |
@@ -92,6 +95,7 @@ pub struct Vgic<V>
     pub address_range: Range<usize>,
     pub vgicd: Vgicd<V>,
     pub cpu_priv: Vec<vint_private::VgicCpuPriv<V>>,  // 0..32
+    // pub vcpu_list : 
 }
 
 impl <V: VcpuTrait> Vgic <V> {
@@ -831,6 +835,10 @@ pub fn vgic_int_is_hw<V: VcpuTrait>(interrupt: &VgicInt<V>) -> bool {
 
 
 /* Do this in config */
+
+pub fn gic_is_priv(int_id: usize) -> bool {
+    int_id < 32
+}
 
 pub static GIC_LRS_NUM: AtomicUsize = AtomicUsize::new(0);
 

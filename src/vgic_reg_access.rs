@@ -10,9 +10,12 @@ extern crate alloc;
 use core::ops::Range;
 
 
-use crate::fake::*;
-
-
+// use crate::fake::*;
+use crate::EmuContext;
+use crate::EmuDeviceType;
+use crate::active_vm_id;
+use crate::active_vm;
+use crate::active_vm_ncpu;
 
 use crate::vgic_traits::VmTrait;
 use crate::vgic_traits::VcpuTrait;
@@ -298,10 +301,10 @@ impl  <V: VcpuTrait + Clone> Vgic<V> {
                 }
             }
             if first_int >= 16 && !vm_has_interrupt_flag {
-                log::warn!(
-                    "emu_icenabler_access: vm[{}] does not have interrupt {}",
-                    vm_id, first_int
-                );
+                // log::warn!(
+                //     "emu_icenabler_access: vm[{}] does not have interrupt {}",
+                //     vm_id, first_int
+                // );
                 return;
             }
         }
@@ -389,12 +392,12 @@ impl  <V: VcpuTrait + Clone> Vgic<V> {
     fn emu_sgiregs_access (&self, emu_ctx: &EmuContext, vcpu: &V) {
         let idx = emu_ctx.reg;
         let val = if emu_ctx.write { vcpu.if_get_gpr(idx) } else { 0 };
-        let vm = match active_vm() {
-            Some(vm) => vm,
-            None => {
-                panic!("emu_sgiregs_access: current vcpu.vm is none");
-            }
-        };
+        // let vm = match active_vm() {
+        //     Some(vm) => vm,
+        //     None => {
+        //         panic!("emu_sgiregs_access: current vcpu.vm is none");
+        //     }
+        // };
 
         if bit_extract(emu_ctx.address, 0, 12) == bit_extract(GicDistributor::gicd_base() + 0x0f00, 0, 12) {
             if emu_ctx.write {
@@ -403,7 +406,7 @@ impl  <V: VcpuTrait + Clone> Vgic<V> {
                 // println!("addr {:x}, sgir trglst flt {}, vtrgt {}", emu_ctx.address, sgir_trglstflt, bit_extract(val, 16, 8));
                 match sgir_trglstflt {
                     0 => {
-                        trgtlist = vgic_target_translate(&vm, bit_extract(val, 16, 8) as u32, true) as usize;
+                        trgtlist = self.vgic_target_translate( bit_extract(val, 16, 8) as u32, true) as usize;
                     }
                     1 => {
                         /* current_cpu().id()  => vcpu->phy_id */
@@ -450,7 +453,7 @@ impl  <V: VcpuTrait + Clone> Vgic<V> {
         let mut val = if emu_ctx.write { vcpu.if_get_gpr(idx) } else { 0 };
         let first_int = (8 / GIC_PRIO_BITS) * bit_extract(emu_ctx.address, 0, 9);
         let vm_id = active_vm_id();
-        let vm = match active_vm() {
+        let vm  = match active_vm() {
             Some(vm) => vm,
             None => {
                 panic!("emu_ipriorityr_access: current vcpu.vm is none");
@@ -498,7 +501,7 @@ impl  <V: VcpuTrait + Clone> Vgic<V> {
         let first_int = (8 / GIC_TARGET_BITS) * bit_extract(emu_ctx.address, 0, 9);
 
         if emu_ctx.write {
-            val = vgic_target_translate(&active_vm().unwrap(), val as u32, true) as usize;
+            val = self.vgic_target_translate( val as u32, true) as usize;
             for i in 0..emu_ctx.width {
                 self.set_trgt(
                     vcpu,
@@ -511,7 +514,7 @@ impl  <V: VcpuTrait + Clone> Vgic<V> {
                 val |= (self.get_trgt(vcpu, first_int + i) as usize)
                     << (GIC_TARGET_BITS * i);
             }
-            val = vgic_target_translate(&active_vm().unwrap(), val as u32, false) as usize;
+            val = self.vgic_target_translate( val as u32, false) as usize;
             let idx = emu_ctx.reg;
             vcpu.if_set_gpr(idx, val);
         }
@@ -600,28 +603,70 @@ impl <V: VcpuTrait + Clone> Vgic<V> {
         }
         true
     }
-}
 
 
-pub fn vgic_target_translate(vm: &Vm, trgt: u32, v2p: bool) -> u32 {
-    let from = trgt.to_le_bytes();
-
-    let mut result = 0;
-    for (idx, val) in from
-        .map(|x| {
-            if v2p {
-                vm.vcpu_to_pcpu_mask(x as usize, 8) as u32
-            } else {
-                vm.pcpu_to_vcpu_mask(x as usize, 8) as u32
+    pub fn vgic_target_translate(&self, trgt: u32, v2p: bool) -> u32 {
+        // pub fn vgic_target_translate(&self, vm: &Vm, trgt: u32, v2p: bool) -> u32 {
+        let from = trgt.to_le_bytes();
+    
+        let mut result = 0;
+        for (idx, val) in from
+            .map(|x| {
+                if v2p {
+                    self.vcpu_to_pcpu_mask(x as usize, 8) as u32
+                } else {
+                    self.pcpu_to_vcpu_mask(x as usize, 8) as u32
+                }
+            })
+            .iter()
+            .enumerate()
+        {
+            result |= *val << (8 * idx);
+            if idx >= 4 {
+                panic!("illegal idx, from len {}", from.len());
             }
-        })
-        .iter()
-        .enumerate()
-    {
-        result |= *val << (8 * idx);
-        if idx >= 4 {
-            panic!("illegal idx, from len {}", from.len());
         }
+        result
     }
-    result
+
+    pub fn vcpu_to_pcpu_mask(&self, mask: usize, len: usize) -> usize {
+        let mut pmask = 0;
+        for i in 0..len {
+            let shift = self.vcpuid_to_pcpuid(i);
+            if mask & (1 << i) != 0 && shift.is_ok() {
+                pmask |= 1 << shift.unwrap();
+            }
+        }
+        pmask
+    }
+
+    pub fn pcpu_to_vcpu_mask(&self, mask: usize, len: usize) -> usize {
+        let mut pmask = 0;
+        for i in 0..len {
+            let shift = self.pcpuid_to_vcpuid(i);
+            if mask & (1 << i) != 0 && shift.is_ok() {
+                pmask |= 1 << shift.unwrap();
+            }
+        }
+        pmask
+    }
+
+    pub fn vcpuid_to_pcpuid(&self, vcpuid: usize) -> Result<usize, ()> {
+        // self.vcpu_list.get(vcpuid).map(|vcpu| vcpu.if_phys_id()).ok_or(())
+        // TODO
+        Ok(1)
+    }
+
+    pub fn pcpuid_to_vcpuid(&self, pcpuid: usize) -> Result<usize, ()> {
+        // for vcpu in &self.vcpu_list {
+        //     if vcpu.if_phys_id() == pcpuid {
+        //         return Ok(vcpu.if_id());
+        //     }
+        // }
+        // Err(())
+        // TODO
+        Ok(1)
+    }
 }
+
+

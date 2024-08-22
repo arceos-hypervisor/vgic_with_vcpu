@@ -36,9 +36,7 @@ impl IrqState {
     }
 }
 
-pub fn gic_is_priv(int_id: usize) -> bool {
-    int_id < 32
-}
+
 
 /* ============================================================================ */
 /* ============================================================================ */
@@ -66,42 +64,6 @@ impl Vm {
     }
 
     /* 下面四个函数 targetr 和 sgi 要用 */
-
-    pub fn vcpuid_to_pcpuid(&self, vcpuid: usize) -> Result<usize, ()> {
-        self.vcpu_list.get(vcpuid).map(|vcpu| vcpu.if_phys_id()).ok_or(())
-    }
-
-    pub fn pcpuid_to_vcpuid(&self, pcpuid: usize) -> Result<usize, ()> {
-        for vcpu in &self.vcpu_list {
-            if vcpu.if_phys_id() == pcpuid {
-                return Ok(vcpu.if_id());
-            }
-        }
-        Err(())
-    }
-
-    pub fn vcpu_to_pcpu_mask(&self, mask: usize, len: usize) -> usize {
-        let mut pmask = 0;
-        for i in 0..len {
-            let shift = self.vcpuid_to_pcpuid(i);
-            if mask & (1 << i) != 0 && shift.is_ok() {
-                pmask |= 1 << shift.unwrap();
-            }
-        }
-        pmask
-    }
-
-    pub fn pcpu_to_vcpu_mask(&self, mask: usize, len: usize) -> usize {
-        let mut pmask = 0;
-        for i in 0..len {
-            let shift = self.pcpuid_to_vcpuid(i);
-            if mask & (1 << i) != 0 && shift.is_ok() {
-                pmask |= 1 << shift.unwrap();
-            }
-        }
-        pmask
-    }
-
 }
 
 /* 实现trait */

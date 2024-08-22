@@ -41,13 +41,13 @@ use alloc::sync::Arc;
 pub use crate::vgic_traits::VcpuTrait;
 pub use crate::vgic_traits::VmTrait;
 
-use lazy_static::lazy_static;
-use axsync::Mutex;
-lazy_static! {
-    pub static ref VM0: Mutex<Vm> = Mutex::new(Vm::new(0));
-    pub static ref VM1: Mutex<Vm> = Mutex::new(Vm::new(1));
-}
-use alloc::sync::Weak;
+// use lazy_static::lazy_static;
+// use axsync::Mutex;
+// lazy_static! {
+//     pub static ref VM0: Mutex<Vm> = Mutex::new(Vm::new(0));
+//     pub static ref VM1: Mutex<Vm> = Mutex::new(Vm::new(1));
+// }
+// use alloc::sync::Weak;
 
 /*
 // init intc for a vm

@@ -9,10 +9,14 @@ use core::cell::Cell;
 use spin::Mutex;
 
 use crate::consts::*;
-use crate::fake::*;
+// use crate::fake::*;
+use crate::vgic::gic_is_priv;
 
 use crate::vgic_traits::PcpuTrait;
 use crate::vgic_traits::VcpuTrait;
+
+use crate::IrqState;
+use crate::current_cpu;
 
 pub struct VgicInt<V>
     where 
