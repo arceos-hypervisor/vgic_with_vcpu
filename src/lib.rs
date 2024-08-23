@@ -84,7 +84,7 @@ pub fn emu_intc_init<V: VcpuTrait>(base_ipa: usize, length: usize, vcpu_list: &[
 */
 
 
-/*
+// /*
 pub fn vgic_set_hw_int(vm: &Vm, int_id: usize) {
     // soft
     if int_id < GIC_SGIS_NUM {
@@ -109,7 +109,7 @@ pub fn vgic_set_hw_int(vm: &Vm, int_id: usize) {
         drop(interrupt_lock);
     }
 }
-*/
+// */
 
 
 // static STATE: AtomicUsize = AtomicUsize::new(0);

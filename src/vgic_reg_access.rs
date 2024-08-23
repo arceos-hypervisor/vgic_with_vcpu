@@ -19,7 +19,7 @@ use crate::active_vm_ncpu;
 
 use crate::vgic_traits::VmTrait;
 use crate::vgic_traits::VcpuTrait;
-
+use log::*;
 
 pub fn vgicd_emu_access_is_vaild(emu_ctx: &EmuContext) -> bool {
     let offset = emu_ctx.address & 0xfff;
@@ -60,10 +60,12 @@ impl  <V: VcpuTrait + Clone> Vgic<V> {
     /* set gpr get gpr */
     /* 找到当前活跃 vm ，向其vcpu发送ipi，保证ctrlr同步 */
     fn emu_ctrl_access (&self, emu_ctx: &EmuContext, vcpu: &mut V) {
+        debug!("ctrl reg access: write: {}", emu_ctx.write);
         if emu_ctx.write {
             let prev_ctlr = self.vgicd_ctlr();
             let idx = emu_ctx.reg;
             self.set_vgicd_ctlr(vcpu.if_get_gpr(idx) as u32 & 0x1);
+            debug!("    prev_ctrl: {:#b}, now: {:#b}", prev_ctlr, vcpu.if_get_gpr(idx));
             if prev_ctlr ^ self.vgicd_ctlr() != 0 {
                 let enable = self.vgicd_ctlr() != 0;
                 let hcr = GicHypervisorInterface::hcr();
@@ -87,6 +89,7 @@ impl  <V: VcpuTrait + Clone> Vgic<V> {
         } else {
             let idx = emu_ctx.reg;
             let val = self.vgicd_ctlr() as usize;
+            debug!("    current ctrl reg: {:#b}", val);
             vcpu.if_set_gpr(idx, val);
         }
     }
@@ -96,6 +99,7 @@ impl  <V: VcpuTrait + Clone> Vgic<V> {
         if !emu_ctx.write {
             let idx = emu_ctx.reg;
             let val = self.vgicd_typer() as usize;
+            debug!("current type reg: {:#b}", val);
             vcpu.if_set_gpr(idx, val);
         } else {
             // warn!("emu_typer_access: can't write to RO reg");
@@ -107,6 +111,7 @@ impl  <V: VcpuTrait + Clone> Vgic<V> {
         if !emu_ctx.write {
             let idx = emu_ctx.reg;
             let val = self.vgicd_iidr() as usize;
+            debug!("current type reg: {:#b}", val);
             vcpu.if_set_gpr(idx, val);
         } else {
             // warn!("emu_iidr_access: can't write to RO reg");
@@ -114,9 +119,8 @@ impl  <V: VcpuTrait + Clone> Vgic<V> {
     }
 
     /* set gpr get gpr */
-    /*  */
     fn emu_isenabler_access(&self, emu_ctx: &EmuContext, vcpu: &mut V) {
-        // println!("DEBUG: in emu_isenabler_access");
+        debug!("isenable reg access: write: {}", emu_ctx.write);
         let reg_idx = (emu_ctx.address & 0b1111111) / 4;
         let idx = emu_ctx.reg;
         let mut val = if emu_ctx.write { vcpu.if_get_gpr(idx) } else { 0 };
@@ -137,12 +141,13 @@ impl  <V: VcpuTrait + Clone> Vgic<V> {
             }
         }
         if first_int >= 16 && !vm_has_interrupt_flag {
-            // error!(
-            //     "emu_isenabler_access: vm[{}] does not have interrupt {}",
-            //     vm_id, first_int
-            // );
+            error!(
+                "emu_isenabler_access: vm[{}] does not have interrupt {}",
+                vcpu.if_vm_id(), first_int
+            );
             return;
         }
+        debug!("    vm_has_interrupt_flag: {} ,first int: {}", vm_has_interrupt_flag, first_int);
 
         if emu_ctx.write {
             for i in 0..32 {
@@ -162,7 +167,6 @@ impl  <V: VcpuTrait + Clone> Vgic<V> {
     }
 
     /* set gpr get gpr */
-    /*  */
     fn emu_pendr_access (&self, emu_ctx: &EmuContext, set: bool, vcpu: &mut V) {
         // trace!("emu_pendr_access");
         let reg_idx = (emu_ctx.address & 0b1111111) / 4;

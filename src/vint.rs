@@ -4,6 +4,7 @@
 
 extern crate alloc;
 use alloc::sync::Arc;
+use log::debug;
 
 use core::cell::Cell;
 use spin::Mutex;
@@ -317,9 +318,12 @@ pub fn vgic_int_get_owner<V: VcpuTrait + Clone>(vcpu: &V, interrupt: &VgicInt<V>
             let owner_vcpu_id = owner.if_id();
             let owner_vm_id = owner.if_vm_id();
 
-            owner_vm_id == vcpu_vm_id && owner_vcpu_id == vcpu_id
+            let is = (owner_vm_id == vcpu_vm_id && owner_vcpu_id == vcpu_id);
+            debug!("int has owner, {}", is);
+            is
         }
         None => {
+            debug!("int no owner, set it");
             interrupt.set_owner(vcpu.clone());
             true
         }

@@ -66,6 +66,8 @@ use crate::InitcEvent;
 use crate::utils::bitmap::BitAlloc;
 use crate::BitAlloc4K;
 
+use log::*;
+
 pub struct Vgicd<V> 
     where V: VcpuTrait
 {
@@ -358,6 +360,7 @@ impl <V: VcpuTrait + Clone> Vgic <V> {
     }
 
     pub fn add_lr(&self, vcpu: &V, interrupt: &VgicInt<V>) -> bool {
+        debug!("[add lr]: {}", interrupt.id());
         if !interrupt.enabled() || interrupt.in_lr() {
             return false;
         }
@@ -513,13 +516,16 @@ impl <V: VcpuTrait + Clone> Vgic <V> {
     }
 
     fn route(&self, vcpu: &V, interrupt: &VgicInt<V>) {
+        debug!("[route]: int id: {}", interrupt.id());
         /* current_cpu().id()  => vcpu->phy_id */
         let cpu_id = vcpu.if_phys_id();
         if let IrqState::IrqSInactive = interrupt.state() {
+            debug!("    ->irq inactivate");
             return;
         }
 
         if !interrupt.enabled() {
+            debug!("    ->irq is not enabled");
             return;
         }
 
@@ -547,20 +553,26 @@ impl <V: VcpuTrait + Clone> Vgic <V> {
         if int_id < GIC_SGIS_NUM {
             return;
         }
+        debug!("[set enable]: intid: {}, en {}", int_id, en);
         match self.get_int(vcpu, int_id) {
             Some(interrupt) => {
                 let interrupt_lock = interrupt.lock.lock();
+                
                 if vgic_int_get_owner(vcpu, interrupt) {
                     if interrupt.enabled() ^ en {
+                        /* int 的状态和将要设置的状态不同 */
                         interrupt.set_enabled(en);
-                        if !interrupt.enabled() {
-                            self.remove_lr(vcpu, interrupt);
-                        } else {
+                        if interrupt.enabled() {
                             self.route(vcpu, interrupt);
+                        } else {
+                            self.remove_lr(vcpu, interrupt);
                         }
-                        if interrupt.hw() {
+                        /* 要开启则调用 route，要关闭则调用 remove lr */
+                        if interrupt.hw() || interrupt.id() == 30 {
+                            debug!("    [set enable]: GicDistributor::set_enable");
                             GicDistributor::set_enable(interrupt.id() as usize, en);
                         }
+                        /* 硬中断就设置real gic */
                     }
                     vgic_int_yield_owner(vcpu, interrupt);
                 } else {
