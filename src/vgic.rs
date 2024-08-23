@@ -137,6 +137,29 @@ impl <V: VcpuTrait> Vgic <V> {
         self.emu_irq_map.contains(&(idx as u64))
     }
 
+    pub fn set_vgic_hw_int(&self, vcpu_list: &[V], int_id: usize) {
+        // soft
+        if int_id < GIC_SGIS_NUM {
+            return;
+        }
+
+        // ppi
+        if int_id < GIC_PRIVINT_NUM {
+            for i in 0..vcpu_list.len() {
+                if let Some(interrupt) = self.get_int(vcpu_list.get(i).unwrap(), int_id) {
+                    let interrupt_lock = interrupt.lock.lock();
+                    interrupt.set_hw(true);
+                    drop(interrupt_lock);
+                }
+            }
+        // spi
+        } else if let Some(interrupt) = self.get_int(vcpu_list.get(0).unwrap(), int_id) {
+            let interrupt_lock = interrupt.lock.lock();
+            interrupt.set_hw(true);
+            drop(interrupt_lock);
+        }
+    }
+
     // vcpu_id
     // 操作vcpu的cpu_priv的 pend list 和 act list
     pub fn update_int_list(&self, vcpu_id: usize, interrupt: &VgicInt<V>) {
@@ -568,7 +591,7 @@ impl <V: VcpuTrait + Clone> Vgic <V> {
                             self.remove_lr(vcpu, interrupt);
                         }
                         /* 要开启则调用 route，要关闭则调用 remove lr */
-                        if interrupt.hw() || interrupt.id() == 30 {
+                        if interrupt.hw() {
                             debug!("    [set enable]: GicDistributor::set_enable");
                             GicDistributor::set_enable(interrupt.id() as usize, en);
                         }
