@@ -13,13 +13,13 @@ use core::ops::Range;
 // use crate::fake::*;
 use crate::EmuContext;
 use crate::EmuDeviceType;
-use crate::active_vm_id;
-use crate::active_vm;
+// use crate::active_vm_id;
+// use crate::active_vm;
 use crate::active_vm_ncpu;
 
 use crate::vgic_traits::VmTrait;
 use crate::vgic_traits::VcpuTrait;
-
+use log::*;
 
 pub fn vgicd_emu_access_is_vaild(emu_ctx: &EmuContext) -> bool {
     let offset = emu_ctx.address & 0xfff;
@@ -60,10 +60,12 @@ impl  <V: VcpuTrait + Clone> Vgic<V> {
     /* set gpr get gpr */
     /* 找到当前活跃 vm ，向其vcpu发送ipi，保证ctrlr同步 */
     fn emu_ctrl_access (&self, emu_ctx: &EmuContext, vcpu: &mut V) {
+        debug!("ctrl reg access: write: {}", emu_ctx.write);
         if emu_ctx.write {
             let prev_ctlr = self.vgicd_ctlr();
             let idx = emu_ctx.reg;
             self.set_vgicd_ctlr(vcpu.if_get_gpr(idx) as u32 & 0x1);
+            debug!("    prev_ctrl: {:#b}, now: {:#b}", prev_ctlr, vcpu.if_get_gpr(idx));
             if prev_ctlr ^ self.vgicd_ctlr() != 0 {
                 let enable = self.vgicd_ctlr() != 0;
                 let hcr = GicHypervisorInterface::hcr();
@@ -87,6 +89,7 @@ impl  <V: VcpuTrait + Clone> Vgic<V> {
         } else {
             let idx = emu_ctx.reg;
             let val = self.vgicd_ctlr() as usize;
+            debug!("    current ctrl reg: {:#b}", val);
             vcpu.if_set_gpr(idx, val);
         }
     }
@@ -96,6 +99,7 @@ impl  <V: VcpuTrait + Clone> Vgic<V> {
         if !emu_ctx.write {
             let idx = emu_ctx.reg;
             let val = self.vgicd_typer() as usize;
+            debug!("current type reg: {:#b}", val);
             vcpu.if_set_gpr(idx, val);
         } else {
             // warn!("emu_typer_access: can't write to RO reg");
@@ -107,6 +111,7 @@ impl  <V: VcpuTrait + Clone> Vgic<V> {
         if !emu_ctx.write {
             let idx = emu_ctx.reg;
             let val = self.vgicd_iidr() as usize;
+            debug!("current type reg: {:#b}", val);
             vcpu.if_set_gpr(idx, val);
         } else {
             // warn!("emu_iidr_access: can't write to RO reg");
@@ -114,35 +119,35 @@ impl  <V: VcpuTrait + Clone> Vgic<V> {
     }
 
     /* set gpr get gpr */
-    /*  */
     fn emu_isenabler_access(&self, emu_ctx: &EmuContext, vcpu: &mut V) {
-        // println!("DEBUG: in emu_isenabler_access");
+        debug!("isenable reg access: write: {}", emu_ctx.write);
         let reg_idx = (emu_ctx.address & 0b1111111) / 4;
         let idx = emu_ctx.reg;
         let mut val = if emu_ctx.write { vcpu.if_get_gpr(idx) } else { 0 };
         let first_int = reg_idx * 32;
-        let vm_id = active_vm_id();
-        let vm = match active_vm() {
-            Some(vm) => vm,
-            None => {
-                panic!("emu_isenabler_access: current vcpu.vm is none");
-            }
-        };
+        // let vm_id = active_vm_id();
+        // let vm = match active_vm() {
+        //     Some(vm) => vm,
+        //     None => {
+        //         panic!("emu_isenabler_access: current vcpu.vm is none");
+        //     }
+        // };
         let mut vm_has_interrupt_flag = false;
 
         for i in 0..32 {
-            if vm.if_has_interrupt(first_int + i) || vm.if_emu_has_interrupt(first_int + i) {
+            if self.has_interrupt(first_int + i) || self.emu_has_interrupt(first_int + i) {
                 vm_has_interrupt_flag = true;
                 break;
             }
         }
         if first_int >= 16 && !vm_has_interrupt_flag {
-            // error!(
-            //     "emu_isenabler_access: vm[{}] does not have interrupt {}",
-            //     vm_id, first_int
-            // );
+            error!(
+                "emu_isenabler_access: vm[{}] does not have interrupt {}",
+                vcpu.if_vm_id(), first_int
+            );
             return;
         }
+        debug!("    vm_has_interrupt_flag: {} ,first int: {}", vm_has_interrupt_flag, first_int);
 
         if emu_ctx.write {
             for i in 0..32 {
@@ -162,7 +167,6 @@ impl  <V: VcpuTrait + Clone> Vgic<V> {
     }
 
     /* set gpr get gpr */
-    /*  */
     fn emu_pendr_access (&self, emu_ctx: &EmuContext, set: bool, vcpu: &mut V) {
         // trace!("emu_pendr_access");
         let reg_idx = (emu_ctx.address & 0b1111111) / 4;
@@ -172,17 +176,17 @@ impl  <V: VcpuTrait + Clone> Vgic<V> {
         
         //vcpu.vm();
         
-        let vm_id = active_vm_id();
-        let vm = match active_vm() {
-            Some(vm) => vm,
-            None => {
-                panic!("emu_pendr_access: current vcpu.vm is none");
-            }
-        };
+        // let vm_id = active_vm_id();
+        // let vm = match active_vm() {
+        //     Some(vm) => vm,
+        //     None => {
+        //         panic!("emu_pendr_access: current vcpu.vm is none");
+        //     }
+        // };
         let mut vm_has_interrupt_flag = false;
 
         for i in 0..emu_ctx.width {
-            if vm.if_has_interrupt(first_int + i) || vm.if_emu_has_interrupt(first_int + i) {
+            if self.has_interrupt(first_int + i) || self.emu_has_interrupt(first_int + i) {
                 vm_has_interrupt_flag = true;
                 break;
             }
@@ -227,17 +231,17 @@ impl  <V: VcpuTrait + Clone> Vgic<V> {
         let idx = emu_ctx.reg;
         let mut val = if emu_ctx.write { vcpu.if_get_gpr(idx) } else { 0 };
         let first_int = reg_idx * 32;
-        let vm_id = active_vm_id();
-        let vm = match active_vm() {
-            Some(vm) => vm,
-            None => {
-                panic!("emu_activer_access: current vcpu.vm is none");
-            }
-        };
+        // let vm_id = active_vm_id();
+        // let vm = match active_vm() {
+        //     Some(vm) => vm,
+        //     None => {
+        //         panic!("emu_activer_access: current vcpu.vm is none");
+        //     }
+        // };
         let mut vm_has_interrupt_flag = false;
 
         for i in 0..32 {
-            if vm.if_has_interrupt(first_int + i) || vm.if_emu_has_interrupt(first_int + i) {
+            if self.has_interrupt(first_int + i) || self.emu_has_interrupt(first_int + i) {
                 vm_has_interrupt_flag = true;
                 break;
             }
@@ -284,18 +288,18 @@ impl  <V: VcpuTrait + Clone> Vgic<V> {
         let idx = emu_ctx.reg;
         let mut val = if emu_ctx.write { vcpu.if_get_gpr(idx) } else { 0 };
         let first_int = reg_idx * 32;
-        let vm_id = active_vm_id();
-        let vm = match active_vm() {
-            Some(vm) => vm,
-            None => {
-                panic!("emu_activer_access: current vcpu.vm is none");
-            }
-        };
+        // let vm_id = active_vm_id();
+        // let vm = match active_vm() {
+        //     Some(vm) => vm,
+        //     None => {
+        //         panic!("emu_activer_access: current vcpu.vm is none");
+        //     }
+        // };
         let mut vm_has_interrupt_flag = false;
 
         if emu_ctx.write {
             for i in 0..32 {
-                if vm.if_has_interrupt(first_int + i) || vm.if_emu_has_interrupt(first_int + i) {
+                if self.has_interrupt(first_int + i) || self.emu_has_interrupt(first_int + i) {
                     vm_has_interrupt_flag = true;
                     break;
                 }
@@ -338,18 +342,18 @@ impl  <V: VcpuTrait + Clone> Vgic<V> {
 
     fn emu_icfgr_access (&self, emu_ctx: &EmuContext, vcpu: &mut V) {
         let first_int = (32 / GIC_CONFIG_BITS) * bit_extract(emu_ctx.address, 0, 9) / 4;
-        let vm_id = active_vm_id();
-        let vm = match active_vm() {
-            Some(vm) => vm,
-            None => {
-                panic!("emu_icfgr_access: current vcpu.vm is none");
-            }
-        };
+        // let vm_id = active_vm_id();
+        // let vm = match active_vm() {
+        //     Some(vm) => vm,
+        //     None => {
+        //         panic!("emu_icfgr_access: current vcpu.vm is none");
+        //     }
+        // };
         let mut vm_has_interrupt_flag = false;
 
         if emu_ctx.write {
             for i in 0..emu_ctx.width * 8 {
-                if vm.if_has_interrupt(first_int + i) || vm.if_emu_has_interrupt(first_int + i) {
+                if self.has_interrupt(first_int + i) || self.emu_has_interrupt(first_int + i) {
                     vm_has_interrupt_flag = true;
                     break;
                 }
@@ -452,18 +456,18 @@ impl  <V: VcpuTrait + Clone> Vgic<V> {
         let idx = emu_ctx.reg;
         let mut val = if emu_ctx.write { vcpu.if_get_gpr(idx) } else { 0 };
         let first_int = (8 / GIC_PRIO_BITS) * bit_extract(emu_ctx.address, 0, 9);
-        let vm_id = active_vm_id();
-        let vm  = match active_vm() {
-            Some(vm) => vm,
-            None => {
-                panic!("emu_ipriorityr_access: current vcpu.vm is none");
-            }
-        };
+        // let vm_id = active_vm_id();
+        // let vm  = match active_vm() {
+        //     Some(vm) => vm,
+        //     None => {
+        //         panic!("emu_ipriorityr_access: current vcpu.vm is none");
+        //     }
+        // };
         let mut vm_has_interrupt_flag = false;
 
         if emu_ctx.write {
             for i in 0..emu_ctx.width {
-                if vm.if_has_interrupt(first_int + i) || vm.if_emu_has_interrupt(first_int + i) {
+                if self.has_interrupt(first_int + i) || self.emu_has_interrupt(first_int + i) {
                     vm_has_interrupt_flag = true;
                     break;
                 }

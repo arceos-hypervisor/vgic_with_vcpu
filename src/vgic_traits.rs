@@ -10,9 +10,9 @@ pub trait VmTrait<V> {
     
     // fn if_vcpu(&self, id :usize) -> Option<&V>;
 
-    fn if_has_interrupt(&self, _id: usize) -> bool;
+    // fn if_has_interrupt(&self, _id: usize) -> bool;
 
-    fn if_emu_has_interrupt(&self, _id: usize) -> bool;
+    // fn if_emu_has_interrupt(&self, _id: usize) -> bool;
 
     // fn get_vgic(&self) -> &Vgic<Vcpu> ;
 }

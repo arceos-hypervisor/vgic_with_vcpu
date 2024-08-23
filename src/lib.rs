@@ -25,6 +25,8 @@ use arm_gic::GICC;
 use fake::*;
 use gich::*;
 
+use utils::bitmap::*;
+
 extern crate alloc;
 use alloc::vec::Vec;
 pub use vgic::Vgic;
@@ -82,32 +84,32 @@ pub fn emu_intc_init<V: VcpuTrait>(base_ipa: usize, length: usize, vcpu_list: &[
 */
 
 
-/*
-pub fn vgic_set_hw_int(vm: &Vm, int_id: usize) {
-    // soft
-    if int_id < GIC_SGIS_NUM {
-        return;
-    }
+// /*
+// pub fn vgic_set_hw_int(vm: &Vm, int_id: usize) {
+//     // soft
+//     if int_id < GIC_SGIS_NUM {
+//         return;
+//     }
 
-    let vgic = vm.get_vgic();
+//     let vgic = vm.get_vgic();
 
-    // ppi
-    if int_id < GIC_PRIVINT_NUM {
-        for i in 0..vm.vcpu_list().len() {
-            if let Some(interrupt) = vgic.get_int(&vm.vcpu(i).unwrap(), int_id) {
-                let interrupt_lock = interrupt.lock.lock();
-                interrupt.set_hw(true);
-                drop(interrupt_lock);
-            }
-        }
-    // spi
-    } else if let Some(interrupt) = vgic.get_int(&vm.vcpu(0).unwrap(), int_id) {
-        let interrupt_lock = interrupt.lock.lock();
-        interrupt.set_hw(true);
-        drop(interrupt_lock);
-    }
-}
-*/
+//     // ppi
+//     if int_id < GIC_PRIVINT_NUM {
+//         for i in 0..vm.vcpu_list().len() {
+//             if let Some(interrupt) = vgic.get_int(&vm.vcpu(i).unwrap(), int_id) {
+//                 let interrupt_lock = interrupt.lock.lock();
+//                 interrupt.set_hw(true);
+//                 drop(interrupt_lock);
+//             }
+//         }
+//     // spi
+//     } else if let Some(interrupt) = vgic.get_int(&vm.vcpu(0).unwrap(), int_id) {
+//         let interrupt_lock = interrupt.lock.lock();
+//         interrupt.set_hw(true);
+//         drop(interrupt_lock);
+//     }
+// }
+// */
 
 
 // static STATE: AtomicUsize = AtomicUsize::new(0);

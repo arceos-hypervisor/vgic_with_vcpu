@@ -63,6 +63,11 @@ use crate::IrqState;
 use crate::IpiInitcMessage;
 use crate::InitcEvent;
 
+use crate::utils::bitmap::BitAlloc;
+use crate::BitAlloc4K;
+
+use log::*;
+
 pub struct Vgicd<V> 
     where V: VcpuTrait
 {
@@ -92,6 +97,8 @@ impl <V: VcpuTrait> Vgicd <V> {
 pub struct Vgic<V>
     where V: VcpuTrait
 {   
+    int_bitmap: BitAlloc4K,
+    emu_irq_map: Vec<u64>,
     pub address_range: Range<usize>,
     pub vgicd: Vgicd<V>,
     pub cpu_priv: Vec<vint_private::VgicCpuPriv<V>>,  // 0..32
@@ -101,9 +108,55 @@ pub struct Vgic<V>
 impl <V: VcpuTrait> Vgic <V> {
     pub fn new(base: usize, length: usize, cpu_num: usize) -> Vgic <V> {
         Vgic {
+            int_bitmap: BitAlloc4K::default(),
+            emu_irq_map: Vec::new(),
             address_range: base..base + length,
             vgicd: Vgicd::new(cpu_num),
             cpu_priv: Vec::new(),
+        }
+    }
+
+
+    // 设置bitmap
+    pub fn set_bitmap(&mut self, idx: usize) {
+        self.int_bitmap.set(idx);
+    }
+
+    // 设置emu_irq_map
+    pub fn set_emu_irq_map(&mut self, irq_id: u64) {
+        self.emu_irq_map.push(irq_id);
+    }
+
+    // 是否存在直通中断idx
+    pub fn has_interrupt(&self, idx: usize) -> bool {
+        self.int_bitmap.get(idx) != 0
+    }
+
+    // 是否存在emu中断idx
+    pub fn emu_has_interrupt(&self, idx: usize) -> bool {
+        self.emu_irq_map.contains(&(idx as u64))
+    }
+
+    pub fn set_vgic_hw_int(&self, vcpu_list: &[V], int_id: usize) {
+        // soft
+        if int_id < GIC_SGIS_NUM {
+            return;
+        }
+
+        // ppi
+        if int_id < GIC_PRIVINT_NUM {
+            for i in 0..vcpu_list.len() {
+                if let Some(interrupt) = self.get_int(vcpu_list.get(i).unwrap(), int_id) {
+                    let interrupt_lock = interrupt.lock.lock();
+                    interrupt.set_hw(true);
+                    drop(interrupt_lock);
+                }
+            }
+        // spi
+        } else if let Some(interrupt) = self.get_int(vcpu_list.get(0).unwrap(), int_id) {
+            let interrupt_lock = interrupt.lock.lock();
+            interrupt.set_hw(true);
+            drop(interrupt_lock);
         }
     }
 
@@ -330,6 +383,7 @@ impl <V: VcpuTrait + Clone> Vgic <V> {
     }
 
     pub fn add_lr(&self, vcpu: &V, interrupt: &VgicInt<V>) -> bool {
+        debug!("[add lr]: {}", interrupt.id());
         if !interrupt.enabled() || interrupt.in_lr() {
             return false;
         }
@@ -485,13 +539,16 @@ impl <V: VcpuTrait + Clone> Vgic <V> {
     }
 
     fn route(&self, vcpu: &V, interrupt: &VgicInt<V>) {
+        debug!("[route]: int id: {}", interrupt.id());
         /* current_cpu().id()  => vcpu->phy_id */
         let cpu_id = vcpu.if_phys_id();
         if let IrqState::IrqSInactive = interrupt.state() {
+            debug!("    ->irq inactivate");
             return;
         }
 
         if !interrupt.enabled() {
+            debug!("    ->irq is not enabled");
             return;
         }
 
@@ -519,20 +576,26 @@ impl <V: VcpuTrait + Clone> Vgic <V> {
         if int_id < GIC_SGIS_NUM {
             return;
         }
+        debug!("[set enable]: intid: {}, en {}", int_id, en);
         match self.get_int(vcpu, int_id) {
             Some(interrupt) => {
                 let interrupt_lock = interrupt.lock.lock();
+                
                 if vgic_int_get_owner(vcpu, interrupt) {
                     if interrupt.enabled() ^ en {
+                        /* int 的状态和将要设置的状态不同 */
                         interrupt.set_enabled(en);
-                        if !interrupt.enabled() {
-                            self.remove_lr(vcpu, interrupt);
-                        } else {
+                        if interrupt.enabled() {
                             self.route(vcpu, interrupt);
+                        } else {
+                            self.remove_lr(vcpu, interrupt);
                         }
+                        /* 要开启则调用 route，要关闭则调用 remove lr */
                         if interrupt.hw() {
+                            debug!("    [set enable]: GicDistributor::set_enable");
                             GicDistributor::set_enable(interrupt.id() as usize, en);
                         }
+                        /* 硬中断就设置real gic */
                     }
                     vgic_int_yield_owner(vcpu, interrupt);
                 } else {
